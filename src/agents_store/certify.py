@@ -1,0 +1,133 @@
+"""certify: run the lens laws over a caller-supplied corpus, record a
+certificate, and (on pass) grant the wrapper its declared attrs.
+
+Laws (contracts.Wrapper docstring):
+  GetPut  put(get(v), e, v) proposes no changes and no refusals.
+  PutGet  for base v1, target v2: apply(v1, put(get(v2), e, v1)) agrees
+          with v2 on every declared attr.
+
+Corpus is a caller-supplied iterable of EntityView dicts — certify never
+invents views itself.
+"""
+from __future__ import annotations
+
+import sqlite3
+from dataclasses import dataclass
+from typing import Any, Iterable, Mapping
+
+from .contracts import AttrSpec, Change, Wrapper
+from .grant import grant
+
+_LENS_ENTITY = "lens-check"
+
+
+def apply(view: Mapping[str, Any], changes: Iterable[Change]) -> dict[str, Any]:
+    """Apply proposed changes to an entity view. Local to certify for now —
+    promote to contracts if wrappers need it."""
+    out = dict(view)
+    for c in changes:
+        cur = out.get(c.a)
+        if isinstance(cur, (tuple, list)):
+            vals = list(cur)
+            if c.added:
+                if c.v not in vals:
+                    vals.append(c.v)
+            else:
+                vals = [x for x in vals if x != c.v]
+            if vals:
+                out[c.a] = tuple(vals)
+            else:
+                out.pop(c.a, None)
+        else:
+            if c.added:
+                out[c.a] = c.v
+            elif cur == c.v:
+                out.pop(c.a, None)
+    return out
+
+
+@dataclass(frozen=True)
+class LensReport:
+    wrapper: str
+    passed: bool
+    attrs_checked: tuple[str, ...]
+    failures: tuple[str, ...]
+
+
+def _declared(w: Wrapper) -> list[str]:
+    return [a.name for a in w.attrs()]
+
+
+def check_lens(w: Wrapper, corpus: Iterable[Mapping[str, Any]]) -> LensReport:
+    views = [dict(v) for v in corpus]
+    attrs = _declared(w)
+    failures: list[str] = []
+
+    for i, v in enumerate(views):
+        r = w.get(_LENS_ENTITY, v)
+        res = w.put(r, _LENS_ENTITY, v)
+        if res.changes or res.refusals:
+            failures.append(
+                f"GetPut[{i}]: put(get(v)) proposed {len(res.changes)} changes, "
+                f"{len(res.refusals)} refusals"
+            )
+
+    for a in attrs:
+        for i, target in enumerate(views):
+            base = views[i - 1]
+            if a not in target and a not in base:
+                continue
+            r = w.get(_LENS_ENTITY, target)
+            res = w.put(r, _LENS_ENTITY, base)
+            if res.refusals:
+                failures.append(f"PutGet[{a}][{i}]: put refused: {res.refusals[0].reason}")
+                continue
+            nxt = apply(base, res.changes)
+            if nxt.get(a) != target.get(a):
+                failures.append(
+                    f"PutGet[{a}][{i}]: expected {target.get(a)!r}, got {nxt.get(a)!r}"
+                )
+
+    return LensReport(
+        wrapper=w.id,
+        passed=not failures,
+        attrs_checked=tuple(attrs),
+        failures=tuple(failures[:20]),
+    )
+
+
+def register_wrapper(conn: sqlite3.Connection, w: Wrapper) -> None:
+    """Insert the wrapper row and its declared attr vocabulary (idempotent)."""
+    impl = f"{type(w).__module__}.{type(w).__qualname__}"
+    conn.execute(
+        "INSERT OR IGNORE INTO wrapper (id, namespace, impl_ref) VALUES (?, ?, ?)",
+        (w.id, w.namespace, impl),
+    )
+    for spec in w.attrs():
+        conn.execute(
+            "INSERT OR IGNORE INTO attr (name, value_type, cardinality, doc) VALUES (?, ?, ?, ?)",
+            (spec.name, spec.value_type, spec.cardinality, spec.doc),
+        )
+
+
+def certify(conn: sqlite3.Connection, w: Wrapper, corpus: Iterable[Mapping[str, Any]],
+            *, tier: str = "witness") -> int:
+    """Run check_lens, register the wrapper + its attrs, write a certificate row.
+    Returns the certificate id. Corpus is materialized once for the n= label."""
+    views = list(corpus)
+    register_wrapper(conn, w)
+    report = check_lens(w, views)
+    return conn.execute(
+        "INSERT INTO certificate (tier, subject, ref, corpus, result) VALUES (?, ?, ?, ?, ?)",
+        (tier, f"wrapper:{w.id}", "check_lens", f"n={len(views)}",
+         "pass" if report.passed else "fail"),
+    ).lastrowid
+
+
+def grant_roundtrip(conn: sqlite3.Connection, w: Wrapper, cert_id: int) -> list[str]:
+    """Grant every attr the wrapper declares, backed by cert_id."""
+    granted = []
+    for spec in w.attrs():
+        grant(conn, w.id, spec.name, cert_id)
+        granted.append(spec.name)
+    return granted
