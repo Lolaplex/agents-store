@@ -25,4 +25,10 @@ python -m venv .venv
 
 Manual pass for A1–A6: `.venv\Scripts\python -m radicale --config examples/radicale.config`, then `python examples/demo.py` and check in Thunderbird.
 
-These commands exist once POC phases P1–P5 land. At Step 0 there is no code yet.
+## Picking up work (subagents)
+
+Work is broken into self-contained cards under `docs/tasks/` (protocol in `docs/tasks/README.md`, module map in `docs/ARCHITECTURE.md`). One card per agent; only touch files under `owns`; shared contracts (`contracts.py`, `schema.sql`, `seed.sql`) are never edited by a task.
+
+## Current state
+
+Contract layer landed and tested: `src/agents_store/{contracts,db,registry}.py`, `schema.sql`, `seed.sql`; `tests/unit` green (`.venv` editable install required for imports). `plugins/`, `examples/` and the rest of `src/agents_store/` land per task card.

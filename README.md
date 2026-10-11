@@ -4,7 +4,7 @@ One identity, many lawful projections.
 
 A thing (an event, a task, a note) is stored once with a minted ID, typed attributes, relations and an append-only history. Calendars, markdown folders and HTML panes are projections of it, not copies. A write through a projection is refused unless a certificate grants it.
 
-Status: **Step 0**. Plan only. See [docs/MEGAPLAN.md](docs/MEGAPLAN.md).
+Status: **contract layer** — schema, shared contracts and registry landed and tested. Implementation is decomposed into task cards under [docs/tasks/](docs/tasks/README.md); the plan is [docs/MEGAPLAN.md](docs/MEGAPLAN.md), the module map [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
 ## POC target
 

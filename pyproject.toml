@@ -13,6 +13,12 @@ authors = [{ name = "Lolaplex" }]
 requires-python = ">=3.11"
 dependencies = []
 
+[project.entry-points."agents_store.wrappers"]
+# Extension point: third-party packages register Wrapper factories here.
+
+[project.entry-points."agents_store.capabilities"]
+# Extension point: third-party packages register Capability factories here.
+
 [tool.setuptools.packages.find]
 where = ["src"]
 
