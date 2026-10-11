@@ -136,11 +136,15 @@ def sync(store: Store, root: str | Path, w: MarkdownWrapper | None = None) -> Sy
             rep.tx_count += 1
             rep.refusals.extend(r.refusals)
 
-    # write-back: entities with body that never had a path get a file
-    body_entities = {
-        r[0] for r in store.conn.execute("SELECT DISTINCT e FROM v_current WHERE a = 'body'")
+    # write-back: entities renderable by the md wrapper that never had a
+    # path get a file (any md-mapped attr, not only body — a CalDAV-created
+    # event must appear as a frontmatter-only note too)
+    renderable = {
+        r[0] for r in store.conn.execute(
+            "SELECT DISTINCT e FROM v_current WHERE a IN "
+            "('title', 'status', 'when', 'end', 'body')")
     }
-    for e in sorted(body_entities):
+    for e in sorted(renderable):
         if _paths_of(store, e) or _ever_had_path(store, e):
             continue
         view = store.view(e)

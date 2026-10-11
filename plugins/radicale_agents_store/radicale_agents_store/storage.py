@@ -71,9 +71,10 @@ class Storage(BaseStorage):
     def __init__(self, configuration) -> None:
         super().__init__(configuration)
         self.db_path = _db_path(configuration)
-        self.conn = agents_store.connect(self.db_path)
-        self.store = Store(self.conn)
         self.wrapper = ICalWrapper()
+        # sqlite objects are thread-affine; Radicale may serve on worker
+        # threads -> one connection per thread (WAL allows this).
+        self._local = threading.local()
         register_wrapper(self.conn, self.wrapper)
         if not is_writable(self.conn, self.wrapper.id, "when"):
             cert = certify(self.conn, self.wrapper, _CORPUS)
@@ -87,6 +88,20 @@ class Storage(BaseStorage):
             "tasks": {"D:displayname": "agents-store tasks",
                       "tag": "VCALENDAR"},
         }
+
+    # ---- per-thread store access ----------------------------------------
+
+    @property
+    def conn(self):
+        if getattr(self._local, "conn", None) is None:
+            self._local.conn = agents_store.connect(self.db_path)
+            self._local.store = Store(self._local.conn)
+        return self._local.conn
+
+    @property
+    def store(self) -> Store:
+        self.conn  # ensure this thread's pair exists
+        return self._local.store
 
     # ---- BaseStorage ---------------------------------------------------
 

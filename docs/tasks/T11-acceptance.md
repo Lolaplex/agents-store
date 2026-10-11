@@ -1,6 +1,6 @@
 ---
 id: T11
-status: open
+status: done
 depends: [T05, T06, T07, T08]
 owns: [tests/acceptance/test_poc.py, docs/acceptance-matrix.md]
 accepts: [A1, A2, A3, A4, A5, A6, A7, A8, A9, A10, A11]
@@ -33,4 +33,14 @@ Each check names its A-id in the test name (`test_A9_note_becomes_task`).
 
 ## Contract changes proposed
 
-(none)
+- Made during implementation (recorded, additive only):
+- store.py: public record_refusal() for adapter-side refusal persistence.
+- wrappers/ical.py: adapter-owned attrs ical:href, ical:client-uid.
+- adapters/folder.py: write-back gate widened from 'body' to any md-mapped
+  attr — a CalDAV-created event must surface as a frontmatter-only note.
+
+## Verified
+
+`.venv\Scripts\python -m unittest discover -s tests` -> 143 tests OK
+(120 core + 11 plugin + 12 acceptance; agents-calendar subprocess witness
+over real HTTP via wsgiref). Matrix: docs/acceptance-matrix.md.
