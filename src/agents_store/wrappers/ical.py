@@ -69,6 +69,8 @@ class ICalWrapper:
             AttrSpec("when", "instant"),
             AttrSpec("end", "instant"),
             AttrSpec("ical:extra", "json", doc="unmapped props, raw lines"),
+            AttrSpec("ical:href", "text", doc="CalDAV resource name (adapter-owned)"),
+            AttrSpec("ical:client-uid", "text", doc="UID as first PUT by client (adapter-owned)"),
         ]
 
     def get(self, e: str, view: Mapping[str, Any]) -> str:

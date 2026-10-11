@@ -131,6 +131,11 @@ class Store:
         )
         return Refusal(wrapper=wrapper, reason=reason, e=e, a=a, payload=str(payload))
 
+    def record_refusal(self, r: Refusal) -> Refusal:
+        """Persist a wrapper-level refusal (parse/type rejections produced by
+        put() before transact ever runs) so every refusal is recorded."""
+        return self._refuse(r.wrapper, r.e, r.a, r.reason, r.payload)
+
     # ---- reads --------------------------------------------------------
 
     def view(self, e: str, *, tx: int | None = None) -> dict[str, Any]:
