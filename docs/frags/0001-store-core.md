@@ -1,6 +1,6 @@
 # 0001 store-core (T01)
 
-- commit: c819d08
+- commit: 3e4bb53
 - task: T01
 - claim: minted IDs (ULID, monotonic same-ms), transact with grant enforcement,
   append-only datoms, cardinality-one auto-retract, as-of views, refusals recorded.
