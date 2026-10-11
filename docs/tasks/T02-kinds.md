@@ -1,6 +1,9 @@
 ---
 id: T02
-status: open
+status: done
+agent: devin-local
+claimed: 2026-10-11
+done: 2026-10-11
 depends: [T01]
 owns: [src/agents_store/kinds.py, tests/unit/test_kinds.py]
 accepts: [A9]
