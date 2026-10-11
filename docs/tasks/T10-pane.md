@@ -1,6 +1,9 @@
 ---
 id: T10
-status: open
+status: done
+agent: devin-local
+claimed: 2026-10-11
+done: 2026-10-11
 depends: [T09]
 owns: [src/agents_store/pane.py, tests/unit/test_pane.py]
 accepts: [A6, A11]

@@ -1,6 +1,9 @@
 ---
 id: T09
-status: open
+status: done
+agent: devin-local
+claimed: 2026-10-11
+done: 2026-10-11
 depends: [T04]
 owns: [src/agents_store/mediator.py, tests/unit/test_mediator.py]
 accepts: [A11]

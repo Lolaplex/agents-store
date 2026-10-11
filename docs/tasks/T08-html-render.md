@@ -1,6 +1,9 @@
 ---
 id: T08
-status: open
+status: done
+agent: devin-local
+claimed: 2026-10-11
+done: 2026-10-11
 depends: [T05]
 owns: [src/agents_store/capabilities/__init__.py, src/agents_store/capabilities/markdown_html.py, src/agents_store/capabilities/entity_html.py, tests/unit/test_capabilities.py]
 accepts: [A6]
