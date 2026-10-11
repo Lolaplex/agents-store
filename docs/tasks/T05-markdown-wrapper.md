@@ -1,6 +1,9 @@
 ---
 id: T05
-status: open
+status: done
+agent: devin-local
+claimed: 2026-10-11
+done: 2026-10-11
 depends: [T04]
 owns: [src/agents_store/wrappers/__init__.py, src/agents_store/wrappers/markdown.py, src/agents_store/adapters/__init__.py, src/agents_store/adapters/folder.py, tests/unit/test_md_wrapper.py, tests/unit/test_folder.py]
 accepts: [A3]
