@@ -1,6 +1,6 @@
 ---
 id: T12
-status: open
+status: done
 depends: [T07, T11]
 owns: [examples/demo.py, docs/walkthrough.md]
 accepts: [A1, A2]
@@ -31,3 +31,4 @@ commands, expected output), Thunderbird checklist steps for A5 manual.
 ## Contract changes proposed
 
 (none)
+

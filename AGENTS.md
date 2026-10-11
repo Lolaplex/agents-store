@@ -23,7 +23,7 @@ python -m venv .venv
 .venv\Scripts\python -m unittest discover -s tests/plugin -v
 ```
 
-Manual pass for A1–A6: `.venv\Scripts\python -m radicale --config examples/radicale.config`, then `python examples/demo.py` and check in Thunderbird.
+Manual pass for A1–A6: `.venv\Scripts\python -m radicale --config examples/radicale.config`, then `python examples/demo.py` and check in Thunderbird. Full transcript + Thunderbird checklist: `docs/walkthrough.md`. Status per criterion: `docs/acceptance-matrix.md`.
 
 ## Picking up work (subagents)
 
@@ -31,4 +31,8 @@ Work is broken into self-contained cards under `docs/tasks/` (protocol in `docs/
 
 ## Current state
 
-Contract layer landed and tested: `src/agents_store/{contracts,db,registry}.py`, `schema.sql`, `seed.sql`; `tests/unit` green (`.venv` editable install required for imports). `plugins/`, `examples/` and the rest of `src/agents_store/` land per task card.
+POC complete through T12: all 12 task cards landed. 144 tests green
+(120 core + 11 plugin + 13 acceptance incl. the agents-calendar
+subprocess witness over real HTTP). Post-POC work lives in
+`docs/tasks/BACKLOG.md`; the megaplan's bigger aspirations
+(mediator generation, agent-rules projections, koru layer) start there.
