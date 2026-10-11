@@ -1,6 +1,10 @@
 ---
 id: T01
-status: open
+status: done
+agent: devin-local
+claimed: 2026-10-11
+done: 2026-10-11
+commit: c819d08
 depends: []
 owns: [src/agents_store/ids.py, src/agents_store/store.py, src/agents_store/grant.py, tests/unit/test_ids.py, tests/unit/test_store.py]
 accepts: [A7]
