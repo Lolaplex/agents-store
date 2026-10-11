@@ -21,14 +21,17 @@ from .grant import grant
 _LENS_ENTITY = "lens-check"
 
 
-def apply(view: Mapping[str, Any], changes: Iterable[Change]) -> dict[str, Any]:
-    """Apply proposed changes to an entity view. Local to certify for now —
-    promote to contracts if wrappers need it."""
+def apply(view: Mapping[str, Any], changes: Iterable[Change],
+          many: frozenset[str] = frozenset()) -> dict[str, Any]:
+    """Apply proposed changes to an entity view. `many` names the attrs whose
+    value is a set of values (cardinality 'many'); a list under a 'one' attr
+    (e.g. json) is a single value. Local to certify for now — promote to
+    contracts if wrappers need it."""
     out = dict(view)
     for c in changes:
         cur = out.get(c.a)
-        if isinstance(cur, (tuple, list)):
-            vals = list(cur)
+        if c.a in many:
+            vals = list(cur) if isinstance(cur, (tuple, list)) else ([] if cur is None else [cur])
             if c.added:
                 if c.v not in vals:
                     vals.append(c.v)
@@ -82,7 +85,7 @@ def check_lens(w: Wrapper, corpus: Iterable[Mapping[str, Any]]) -> LensReport:
             if res.refusals:
                 failures.append(f"PutGet[{a}][{i}]: put refused: {res.refusals[0].reason}")
                 continue
-            nxt = apply(base, res.changes)
+            nxt = apply(base, res.changes, many={s.name for s in w.attrs() if s.cardinality == "many"})
             if nxt.get(a) != target.get(a):
                 failures.append(
                     f"PutGet[{a}][{i}]: expected {target.get(a)!r}, got {nxt.get(a)!r}"

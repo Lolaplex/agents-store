@@ -1,8 +1,9 @@
 ---
 id: T06
-status: claimed
+status: done
 agent: devin-local
 claimed: 2026-10-11
+done: 2026-10-11
 depends: [T04]
 owns: [src/agents_store/wrappers/ical.py, tests/unit/test_ical.py]
 accepts: [A4]
