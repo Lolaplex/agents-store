@@ -1,6 +1,8 @@
 ---
 id: T13
-status: open
+status: claimed
+agent: devin-local
+claimed: 2026-10-17
 depends: []
 owns: [src/agents_store/wrappers/jsoncal.py, src/agents_store/adapters/jsonfile.py, tests/unit/test_jsoncal.py, tests/unit/test_jsonfile.py]
 accepts: []
@@ -40,10 +42,11 @@ Attrs (register on wrapper registration, like `md:`/`ical:`):
   (one file may hold many items; value = `path#uid`).
 
 `get(e, view)` renders one item object (dict → JSON text of the single
-item). `put(rep, e, view)` parses one item object; `uid` present and
-mismatching `jcal:uid` in view → refusal `uid-mismatch`; non-dict/array
-or unparseable JSON → `parse-fail`; instant fields not ISO-8601 `Z` →
-`tz-unsupported`.
+item). `put(rep, e, view)` parses one item object; a `uid` change is an
+ordinary revision of `jcal:uid` (provenance, not identity — PutGet
+requires it to be writable; uid→entity alignment is the adapter's job
+via `_by_uid`, not a wrapper refusal); non-dict/array or unparseable
+JSON → `parse-fail`; instant fields not ISO-8601 `Z` → `tz-unsupported`.
 
 ## Adapter (`adapters/jsonfile.py`)
 
