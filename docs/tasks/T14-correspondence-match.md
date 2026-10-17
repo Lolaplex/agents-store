@@ -1,8 +1,10 @@
 ---
 id: T14
-status: claimed
+status: done
 agent: devin-local
 claimed: 2026-10-17
+done: 2026-10-17
+commit: f94fb21
 depends: []
 owns: [src/agents_store/match.py, tests/unit/test_match.py]
 accepts: []

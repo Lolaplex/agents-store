@@ -54,6 +54,7 @@ class Store:
     def __init__(self, conn: sqlite3.Connection):
         self.conn = conn
         self._specs: dict[str, tuple[str, str]] | None = None
+        self._deriving = False  # re-entrancy guard for derive.on_transact
 
     # ---- writes -------------------------------------------------------
 
@@ -91,6 +92,15 @@ class Store:
                 refusals.append(outcome)
             else:
                 applied.extend(outcome)
+        # mediated re-derivation: source-attr changes refresh their
+        # derived attrs in a follow-up tx (append-only: no tx nesting)
+        if applied and not self._deriving:
+            from . import derive
+            self._deriving = True
+            try:
+                derive.on_transact(self, {(d.e, d.a) for d in applied})
+            finally:
+                self._deriving = False
         return TxResult(tx=tx_id, entity=minted, applied=tuple(applied), refusals=tuple(refusals))
 
     def _apply(self, e: str, ch: Change, tx_id: int, wrapper: str) -> list[Datom] | Refusal:
