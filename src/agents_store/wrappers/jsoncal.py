@@ -52,6 +52,9 @@ class JsoncalWrapper:
             AttrSpec("jcal:extra", "json", doc="unmapped keys, lossless"),
             AttrSpec("jcal:path", "text", "many",
                      doc="export file membership 'path#uid' (adapter-owned)"),
+            AttrSpec("jcal:rev", "text", "many",
+                     doc="last-emitted item hash '<slot> <sha256>' "
+                         "(adapter-owned)"),
         ]
 
     # ---- get: view -> text -------------------------------------------

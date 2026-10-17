@@ -31,9 +31,10 @@ Work is broken into self-contained cards under `docs/tasks/` (protocol in `docs/
 
 ## Current state
 
-POC complete through T12: all 12 task cards landed. 156 tests
-(128 unit + 15 plugin + 13 acceptance incl. the agents-calendar
-subprocess witness over real HTTP when installed). Audit ledger:
-`docs/AUDIT.md`. Post-POC work lives in
-`docs/tasks/BACKLOG.md`; the megaplan's bigger aspirations
-(mediator generation, agent-rules projections, koru layer) start there.
+POC frozen at tag `poc-v1` (commit `fff6ccc`, 156 tests). Megaplan
+§6.1 (generated mediators) complete through T16: jsoncal source,
+correspondence match+witness, generated mediator materialization,
+mediated write-back via CalDAV — **189 tests** green. Audit ledger:
+`docs/AUDIT.md`. Post-POC work continues in `docs/tasks/BACKLOG.md`
+(agent-rules projections, koru layer, file-adapter merge semantics,
+glue specialization).

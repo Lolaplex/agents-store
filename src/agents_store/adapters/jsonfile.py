@@ -9,12 +9,17 @@ Rules:
   items carry minted ids); unresolved or absent uid -> mint;
 - `jcal:path` = '<relpath>#<uid>' marks file membership; an item removed
   from the file gets its path datum retracted — the entity survives;
+- `jcal:rev` = '<slot> <sha256>' records the last render exported to a
+  slot; an item whose file content still matches it is skipped on
+  ingest, so a store-side edit is not reverted by a stale file (a file
+  the user edited always wins over the store — no merge);
 - after ingest the file is re-exported from the store (sorted keys,
   sorted by uid) so round-trips converge;
 - per-item failures are refusal rows; other items still land.
 """
 from __future__ import annotations
 
+import hashlib
 import json
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -59,6 +64,18 @@ def _paths_of(store: Store, e: str) -> list[str]:
     return [r[0] for r in rows]
 
 
+def _revs_of(store: Store, e: str) -> set[str]:
+    rows = store.conn.execute(
+        "SELECT v FROM v_current WHERE e = ? AND a = 'jcal:rev'", (e,)
+    ).fetchall()
+    return {r[0] for r in rows}
+
+
+def _item_hash(item: dict) -> str:
+    canon = json.dumps(item, sort_keys=True, separators=(",", ":"))
+    return hashlib.sha256(canon.encode("utf-8")).hexdigest()
+
+
 def sync(store: Store, path: str | Path, w: JsoncalWrapper | None = None) -> SyncReport:
     w = w or JsoncalWrapper()
     path = Path(path)
@@ -88,6 +105,14 @@ def sync(store: Store, path: str | Path, w: JsoncalWrapper | None = None) -> Syn
         raw_uid = item.get("uid")
         uid = str(raw_uid) if raw_uid is not None else None
         e = _by_uid(store, uid) if uid else None
+        if uid is not None and e is not None:
+            rev_key = f"{tag}#{uid} {_item_hash(item)}"
+            if rev_key in _revs_of(store, e):
+                # file item identical to the last exported render: the
+                # file side is quiescent — do not let it revert store
+                # edits that arrived through other projections
+                seen_slots.add(f"{tag}#{uid}")
+                continue
         view = store.view(e) if e else {}
         res = w.put(json.dumps(item), e, view)
         if res.refusals:
@@ -117,8 +142,12 @@ def sync(store: Store, path: str | Path, w: JsoncalWrapper | None = None) -> Syn
     for e, p in store.conn.execute(
             "SELECT e, v FROM v_current WHERE a = 'jcal:path'").fetchall():
         if p.startswith(f"{tag}#") and p not in seen_slots:
-            r = store.transact([Change(e=e, a="jcal:path", v=p, added=False)],
-                               wrapper="jcal", note=f"jsonfile sync: removed {p}")
+            changes = [Change(e=e, a="jcal:path", v=p, added=False)]
+            changes += [Change(e=e, a="jcal:rev", v=rv, added=False)
+                        for rv in _revs_of(store, e)
+                        if rv.startswith(f"{p} ")]
+            r = store.transact(changes, wrapper="jcal",
+                               note=f"jsonfile sync: removed {p}")
             rep.tx_count += 1
             rep.refusals.extend(r.refusals)
 
@@ -127,11 +156,28 @@ def sync(store: Store, path: str | Path, w: JsoncalWrapper | None = None) -> Syn
         "SELECT DISTINCT e FROM v_current WHERE a = 'jcal:path' "
         "AND v LIKE ?", (f"{tag}#%",))]
     if member_es:
-        rendered = [json.loads(w.get(e, store.view(e))) for e in member_es]
-        rendered.sort(key=lambda it: str(it.get("uid", "")))
-        out = json.dumps(rendered, indent=2, sort_keys=True) + "\n"
+        rendered = [(e, json.loads(w.get(e, store.view(e))))
+                    for e in member_es]
+        rendered.sort(key=lambda t: str(t[1].get("uid", "")))
+        out = json.dumps([it for _, it in rendered],
+                         indent=2, sort_keys=True) + "\n"
         if not path.exists() or path.read_text(encoding="utf-8") != out:
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_text(out, encoding="utf-8")
             rep.written = True
+        # record the render each slot now carries, so the next sync can
+        # tell "file edited" apart from "store moved under a stale file"
+        for e, it in rendered:
+            slot = f"{tag}#{it.get('uid') or e}"
+            want = f"{slot} {_item_hash(it)}"
+            revs = _revs_of(store, e)
+            changes = [Change(e=e, a="jcal:rev", v=rv, added=False)
+                       for rv in revs if rv.startswith(f"{slot} ")]
+            if want not in revs:
+                changes.append(Change(e=e, a="jcal:rev", v=want))
+            if changes:
+                r = store.transact(changes, wrapper="jcal",
+                                   note=f"jsonfile rev {slot}")
+                rep.tx_count += 1
+                rep.refusals.extend(r.refusals)
     return rep

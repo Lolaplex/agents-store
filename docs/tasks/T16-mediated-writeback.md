@@ -1,6 +1,6 @@
 ---
 id: T16
-status: open
+status: done
 depends: [T13, T15]
 owns: [src/agents_store/store.py, tests/acceptance/test_mediation.py]
 accepts: []
@@ -64,3 +64,21 @@ The §6.1 demo end to end, real surfaces only:
 ## Contract changes proposed
 
 (none)
+
+## Landed (deviations from `owns`)
+
+- `derive.py` — `is_derived`/`derived_edge` lookup + `json_valid` guard
+  (`out_ref` is shared with T09's capability mediators, whose rows are
+  non-JSON strings; `json_extract` on them raised `malformed JSON` and
+  broke every `transact` once a capability mediation ran — caught by
+  `test_demo` regression).
+- `jsoncal.py` — one new adapter-owned attr `jcal:rev`
+  (`'<slot> <sha256>'`, cardinality many).
+- `adapters/jsonfile.py` — last-render tracking: ingest skips an item
+  whose file content still equals the hash exported last time, so a
+  stale file cannot revert a store-side edit (silent data-loss path
+  found by the acceptance test itself — CalDAV edit was reverted by the
+  re-export sync before the fix). `folder.py` has the same semantic gap
+  and is unchanged — see BACKLOG.
+- agents-calendar CLI is the write-back witness (list→update with
+  etag); its `update` requires DTEND, so the test event carries one.

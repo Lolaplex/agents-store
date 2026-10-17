@@ -18,6 +18,11 @@ promotion.
 - **Glue specialization**: generated composite paths cached in `mediator`;
   later, fuse paths to remove hub materialization (Jones-optimality as the
   bar, cf. isar-proofs Futamura.lean).
+- **File-adapter merge semantics**: `jsonfile` tracks last renders via
+  `jcal:rev` so stale files can't revert store-side edits (T16); the
+  same gap exists in `folder.py` (`md:rev` equivalent). Longer term:
+  a real base/ours/theirs merge instead of file-wins on divergent
+  edits — per-slot hashes only cover the quiescent-file case.
 - **WASM component-model sandbox** for untrusted capability impls (codec
   parsers are attack surface).
 - **Solid-style vocabulary publishing**: export attr namespace + kinds so

@@ -85,10 +85,28 @@ def is_derived(conn: sqlite3.Connection, e: str, a: str) -> int | None:
     row = conn.execute(
         "SELECT p.mediator_id FROM provenance p"
         " JOIN v_current vc ON vc.tx = p.tx"
-        "   AND vc.e = json_extract(p.out_ref, '$.e')"
-        "   AND vc.a = json_extract(p.out_ref, '$.a')"
+        "   AND vc.e = (CASE WHEN json_valid(p.out_ref)"
+        "     THEN json_extract(p.out_ref, '$.e') END)"
+        "   AND vc.a = (CASE WHEN json_valid(p.out_ref)"
+        "     THEN json_extract(p.out_ref, '$.a') END)"
         " WHERE vc.e = ? AND vc.a = ? LIMIT 1", (e, a)).fetchone()
     return row[0] if row else None
+
+
+def derived_edge(conn: sqlite3.Connection, e: str, a_to: str):
+    """(mediator_id, a_from, kind, status) if a live mediator currently
+    derives (e, a_to), else None. Drives write-back inversion."""
+    mid = is_derived(conn, e, a_to)
+    if mid is None:
+        return None
+    m = _load(conn, mid)
+    for a_from, at in m.edges:
+        if at == a_to:
+            row = conn.execute(
+                "SELECT kind, status FROM correspondence"
+                " WHERE a_from = ? AND a_to = ?", (a_from, a_to)).fetchone()
+            return (mid, a_from, row[0], row[1]) if row else None
+    return None
 
 
 def run(store, mediator_id: int) -> dict:

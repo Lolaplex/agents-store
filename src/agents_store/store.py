@@ -67,14 +67,37 @@ class Store:
         op: TxOp = "assert",
         note: str | None = None,
     ) -> TxResult:
+        # mediated write-back: an external write to a derived attr routes
+        # through its correspondence back to the source attr (equal +
+        # witnessed only); non-round-trippable writes are refused.
+        from . import derive, grant as _grant
+        refusals: list[Refusal] = []
+        mediated: set[int] = set()
+        planned: list[tuple[Change, str]] = []
+        for ch in changes:
+            if ch.e is not None and wrapper != _grant.INTERNAL_WRAPPER:
+                edge = derive.derived_edge(self.conn, ch.e, ch.a)
+                if edge is not None:
+                    mid, a_from, kind, status = edge
+                    if kind == "equal" and status == "witnessed":
+                        planned.append((Change(
+                            e=ch.e, a=a_from, v=ch.v, added=ch.added),
+                            _grant.INTERNAL_WRAPPER))
+                        mediated.add(mid)
+                    else:
+                        refusals.append(self._refuse(
+                            wrapper, ch.e, ch.a, "derived-attr", ch.v))
+                    continue
+            planned.append((ch, wrapper))
+        if mediated:
+            note = f"{note or ''} | mediated-write via mediator {sorted(mediated)}"
         tx_id = self.conn.execute(
             "INSERT INTO tx (op, agent, wrapper, note) VALUES (?, ?, ?, ?)",
             (op, agent, wrapper, note),
         ).lastrowid
         minted: str | None = None
         applied: list[Datom] = []
-        refusals: list[Refusal] = []
-        for ch in changes:
+        for ch, ch_wrapper in planned:
             e = ch.e
             if e is None:
                 if minted is None:
@@ -87,7 +110,7 @@ class Store:
             elif not self._exists(e):
                 refusals.append(self._refuse(wrapper, e, ch.a, "unknown-entity", ch.v))
                 continue
-            outcome = self._apply(e, ch, tx_id, wrapper)
+            outcome = self._apply(e, ch, tx_id, ch_wrapper)
             if isinstance(outcome, Refusal):
                 refusals.append(outcome)
             else:
