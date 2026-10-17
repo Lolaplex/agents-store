@@ -44,8 +44,14 @@ T11 acceptance (A1–A11) ← T05,T06,T07,T08
 T12 demo + walkthrough  ← T07,T11
 ```
 
-Parallel-ready now: **T01** only (everything else depends on it). After T01:
-T02/T03/T04 in parallel; T05/T06 in parallel after T04.
+Post-POC (§6.1 generated mediators, started after tag `poc-v1`):
+
+```
+T13 jsoncal wrapper+jsonfile ─┐
+T14 correspondence match ─────┴─ T15 derive (materialize) ── T16 write-back+accept
+```
+
+Parallel-ready now: **T13 ∥ T14**.
 
 ## Verification command (all cards)
 

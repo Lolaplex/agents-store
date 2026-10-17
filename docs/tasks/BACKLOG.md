@@ -1,16 +1,20 @@
-# Backlog — post-POC (do NOT start before A1–A11 pass)
+# Backlog — post-POC
 
-Not cards yet; seed for the next planning round. Each needs evidence of a real
-need from the POC before promotion.
+POC passed (tag `poc-v1`, 2026-10-17). Not cards yet; seed for the next
+planning round. Each needs evidence of a real need from the POC before
+promotion.
+
+**Promoted to cards:** correspondence matching + generated mediators
+(T13–T16, MEGAPLAN §6.1).
 
 - **ProjFS / filesystem adapter**: entities-with-body as files-on-demand
   (Windows-only; pair with T05 folder adapter learnings).
 - **WebDAV wrapper**: file-level protocol sibling to folder adapter.
 - **CardDAV, IMAP/Maildir wrappers**: contacts; mail (Message-ID minted IDs +
   In-Reply-To lineage are PROV-shaped already).
-- **Correspondence matching (`Match`)**: propose `equal`/`refines` edges
-  between namespaced attrs — structural + LLM candidates, witness-tier until
-  proven. Requires ≥2 wrappers with overlapping semantics (md/ical do).
+- ~~**Correspondence matching (`Match`)**~~ → T14.
+- ~~**Generated mediators**~~ → T15/T16 (attr-level materialization;
+  render-path mediation already in `mediator.py` from T09).
 - **Glue specialization**: generated composite paths cached in `mediator`;
   later, fuse paths to remove hub materialization (Jones-optimality as the
   bar, cf. isar-proofs Futamura.lean).
