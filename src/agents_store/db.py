@@ -5,11 +5,73 @@ import sqlite3
 from importlib import resources
 from pathlib import Path
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
+
+_HISTORY_TABLES = (
+    "tx", "lineage", "certificate", "grant_", "refusal", "provenance",
+)
 
 
 def _sql(name: str) -> str:
     return resources.files("agents_store").joinpath(name).read_text(encoding="utf-8")
+
+
+def _table_sql(conn: sqlite3.Connection, name: str) -> str | None:
+    row = conn.execute(
+        "SELECT sql FROM sqlite_master WHERE type='table' AND name=?", (name,)
+    ).fetchone()
+    return row[0] if row else None
+
+
+def _migrate_v2(conn: sqlite3.Connection) -> None:
+    ver = conn.execute("PRAGMA user_version").fetchone()[0]
+    if ver >= SCHEMA_VERSION:
+        return
+
+    cols = {r[1] for r in conn.execute("PRAGMA table_info(certificate)")}
+    if "code_hash" not in cols:
+        conn.execute("ALTER TABLE certificate ADD COLUMN code_hash TEXT NOT NULL DEFAULT ''")
+
+    conn.executescript(_sql("schema.sql"))
+
+    tx_sql = _table_sql(conn, "tx") or ""
+    if "'retire'" not in tx_sql:
+        conn.executescript("""
+            PRAGMA foreign_keys=OFF;
+            CREATE TABLE tx_new (
+              id      INTEGER PRIMARY KEY AUTOINCREMENT,
+              ts      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+              agent   TEXT,
+              wrapper TEXT,
+              op      TEXT NOT NULL CHECK (op IN ('assert','evolve','split','merge','correct','retire')),
+              note    TEXT
+            );
+            INSERT INTO tx_new SELECT * FROM tx;
+            DROP TABLE tx;
+            ALTER TABLE tx_new RENAME TO tx;
+            PRAGMA foreign_keys=ON;
+        """)
+
+    lin_sql = _table_sql(conn, "lineage") or ""
+    if "'severs'" not in lin_sql:
+        conn.executescript("""
+            PRAGMA foreign_keys=OFF;
+            CREATE TABLE lineage_new (
+              child  TEXT    NOT NULL REFERENCES entity(id),
+              parent TEXT    NOT NULL REFERENCES entity(id),
+              kind   TEXT    NOT NULL CHECK (kind IN (
+                'wasDerivedFrom','wasRevisionOf','alternateOf','specializationOf','severs')),
+              tx     INTEGER NOT NULL REFERENCES tx(id),
+              reason TEXT,
+              PRIMARY KEY (child, parent, kind, tx)
+            );
+            INSERT INTO lineage_new SELECT * FROM lineage;
+            DROP TABLE lineage;
+            ALTER TABLE lineage_new RENAME TO lineage;
+            PRAGMA foreign_keys=ON;
+        """)
+
+    conn.execute(f"PRAGMA user_version = {SCHEMA_VERSION}")
 
 
 def connect(path: str | Path = ":memory:") -> sqlite3.Connection:
@@ -20,5 +82,7 @@ def connect(path: str | Path = ":memory:") -> sqlite3.Connection:
         conn.execute("PRAGMA journal_mode = WAL")
     conn.executescript(_sql("schema.sql"))
     conn.executescript(_sql("seed.sql"))
-    conn.execute(f"PRAGMA user_version = {SCHEMA_VERSION}")
+    _migrate_v2(conn)
+    if conn.execute("PRAGMA user_version").fetchone()[0] < SCHEMA_VERSION:
+        conn.execute(f"PRAGMA user_version = {SCHEMA_VERSION}")
     return conn
