@@ -1,6 +1,6 @@
 # 0003 lineage ops (T03)
 
-- commit: <this commit>
+- commit: 4068e0eccdbd81fd549208a47c87751dcb0a5c2 (audit: `severs` for correct; v0 ledger)
 - task: T03
 - claim: split/merge/correct/evolve as single atomic txs under 'store' authority,
   PROV lineage edges; superseded entities stay readable; merge conflicts on
