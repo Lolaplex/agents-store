@@ -113,13 +113,17 @@ def mediate(conn: sqlite3.Connection, reg: Registry, e: str, out_kind: str,
         if c.mode != "lens":
             exact = False
     exactness = "exact" if exact else "contained"
+    tx_id = conn.execute(
+        "INSERT INTO tx (op, wrapper, note) VALUES ('assert', 'store', ?)",
+        (f"mediate {e} -> {out_kind}",),
+    ).lastrowid
     mid = conn.execute(
         "INSERT INTO mediator (source, target, path, exactness) VALUES (?, ?, ?, ?)",
         (in_kind, out_kind, json.dumps(steps), exactness),
     ).lastrowid
     conn.execute(
-        "INSERT INTO provenance (out_ref, in_refs, mediator_id) VALUES (?, ?, ?)",
-        (f"{e}:{out_kind}:{mid}", json.dumps([e, in_kind]), mid),
+        "INSERT INTO provenance (out_ref, in_refs, mediator_id, tx) VALUES (?, ?, ?, ?)",
+        (f"{e}:{out_kind}:{mid}", json.dumps([e, in_kind]), mid, tx_id),
     )
     return Artifact(value=value, out_kind=out_kind, exactness=exactness,
                     path=path, mediator_id=mid)

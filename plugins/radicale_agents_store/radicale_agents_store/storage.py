@@ -309,11 +309,12 @@ class Collection(BaseCollection):
         # leaves every projection; all datoms stay in history.
         changes = [Change(e=e, a=a, v=view[a], added=False)
                    for a in _MAPPED_ATTRS if a in view]
-        if "ical:href" in view:
-            changes.append(Change(e=e, a="ical:href", v=view["ical:href"],
-                                  added=False))
-        result = store.transact(changes, wrapper="ical",
-                                note=f"caldav DELETE {self._path}/{href}")
+        for a in sorted(view):
+            if a.startswith("ical:"):
+                changes.append(Change(e=e, a=a, v=view[a], added=False))
+        result = store.transact(
+            changes, wrapper="ical", op="retire", note=href,
+        )
         self._storage.conn.commit()
         if result.refusals:
             raise ValueError(f"store refusal: {result.refusals[0].reason}")

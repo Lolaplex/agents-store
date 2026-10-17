@@ -109,8 +109,9 @@ def merge(store: Store, es: Sequence[str], *, reason: str,
 def correct(store: Store, e: str, supersedes: str, *, reason: str,
             agent: str | None = None) -> int:
     """Record that `e` is the corrected form of `supersedes`.
-    PROV: wasRevisionOf e -> supersedes. The superseded entity is not
-    deleted; callers detect it via superseded_by()."""
+    Lineage kind `severs` (not wasRevisionOf) distinguishes correction from
+    evolve. The superseded entity is not deleted; callers detect it via
+    superseded_by()."""
     conn = store.conn
     for x in (e, supersedes):
         if not store.exists(x):
@@ -118,7 +119,7 @@ def correct(store: Store, e: str, supersedes: str, *, reason: str,
     conn.execute("BEGIN")
     try:
         tx = _tx(conn, "correct", agent, reason)
-        _edge(conn, e, supersedes, "wasRevisionOf", tx, reason)
+        _edge(conn, e, supersedes, "severs", tx, reason)
         conn.execute("COMMIT")
         return tx
     except BaseException:
@@ -129,7 +130,7 @@ def correct(store: Store, e: str, supersedes: str, *, reason: str,
 def superseded_by(store: Store, e: str) -> str | None:
     """Latest entity that supersedes e, if any."""
     row = store.conn.execute(
-        "SELECT child FROM lineage WHERE parent = ? AND kind = 'wasRevisionOf' ORDER BY tx DESC LIMIT 1",
+        "SELECT child FROM lineage WHERE parent = ? AND kind = 'severs' ORDER BY tx DESC LIMIT 1",
         (e,),
     ).fetchone()
     return row[0] if row else None
