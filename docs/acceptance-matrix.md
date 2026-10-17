@@ -10,7 +10,7 @@ mapping to the megaplan numbering noted where different).
 | A3 | Markdown round-trip; rename keeps entity id | ✅ scripted | `test_A3_md_edit_and_rename` |
 | A4 | Emitted UID = entity id; event/task membership | ✅ scripted | `test_A4_uid_and_membership`, plugin `test_put_get_vevent` |
 | A5 | Independent witness: agents-calendar over real HTTP | ✅ scripted | `test_A5_agents_calendar_list_update_delete` (subprocess, real socket) |
-| A5 | Thunderbird manual pass | ⏳ manual | checklist in `examples/` (T12) |
+| A5 | Thunderbird manual pass | ✅ manual | BetterBird 153.1 pass 2026-10-17: event plots, tasks is a task list; checklist in `examples/` (T12) |
 | A6 | HTML pane renders same identity | ✅ scripted | `test_A6_pane_same_id` |
 | A7 | History append-only; UPDATE/DELETE on `datom` fail | ✅ scripted | `test_A7_datom_immutable` |
 | A8 | Malformed payloads refused, no partial writes | ✅ scripted | `test_A8_bad_ics_no_partial`, `test_A8_md_id_edit_refused` |
