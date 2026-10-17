@@ -73,9 +73,20 @@ class ICalWrapper:
             AttrSpec("ical:client-uid", "text", doc="UID as first PUT by client (adapter-owned)"),
         ]
 
-    def get(self, e: str, view: Mapping[str, Any]) -> str:
-        is_todo = "status" in view and view.get("status") is not None
-        comp = "VTODO" if is_todo else "VEVENT"
+    def get(self, e: str, view: Mapping[str, Any],
+            component: str | None = None) -> str:
+        """Render VEVENT or VTODO. `component` pins the shape for a
+        surface that only speaks one component (e.g. a calendar
+        collection renders members as VEVENT even when the entity is
+        also a task — `status` is then out of this projection's terms).
+        VEVENT omits STATUS: our open|done enum is VTODO-only."""
+        if component is not None:
+            comp = component.upper()
+            if comp not in ("VEVENT", "VTODO"):
+                raise ValueError(f"unsupported component {component!r}")
+        else:
+            comp = "VTODO" if view.get("status") is not None else "VEVENT"
+        is_todo = comp == "VTODO"
         lines = ["BEGIN:VCALENDAR", _VERSION, _PRODID, f"BEGIN:{comp}", f"UID:{e}"]
         if view.get("title") is not None:
             lines.append(f"SUMMARY:{_esc(view['title'])}")
@@ -83,7 +94,7 @@ class ICalWrapper:
             lines.append(f"DTSTART:{_to_ical_dt(view['when'])}")
         if view.get("end") is not None:
             lines.append(("DUE:" if is_todo else "DTEND:") + _to_ical_dt(view["end"]))
-        if is_todo:
+        if is_todo and view.get("status") is not None:
             lines.append(f"STATUS:{_STATUS_TO_ICAL.get(view['status'], view['status'])}")
         extra = view.get("ical:extra")
         if isinstance(extra, (list, tuple)):

@@ -26,7 +26,7 @@ from radicale.storage import BaseCollection, BaseStorage
 
 import agents_store
 from agents_store.certify import certify, grant_roundtrip, register_wrapper
-from agents_store.contracts import Change
+from agents_store.contracts import Change, Refusal
 from agents_store.grant import is_writable
 from agents_store.store import Store
 from agents_store.wrappers.ical import ICalWrapper
@@ -34,6 +34,20 @@ from agents_store.wrappers.ical import ICalWrapper
 # collection -> attr that grants membership (kinds are structural)
 COLLECTIONS = {"calendar": "when", "tasks": "status"}
 _MAPPED_ATTRS = ("title", "status", "when", "end")
+
+# Per-surface projection law:
+# - `calendar` renders members as VEVENT: a task with `when` is plotted
+#   there; `status` is out of that surface's terms.
+# - `tasks` renders VTODO (full round-trip set).
+# The write-set names what a surface may change. A PUT that alters
+# anything outside it is NOT silently dropped and NOT wholly rejected:
+# the out-of-projection changes become `refusal` rows of reason
+# 'out-of-projection' while the lawful part lands.
+COMPONENT = {"calendar": "VEVENT", "tasks": "VTODO"}
+WRITE_SETS = {
+    "calendar": {"title", "when", "end", "ical:extra"},
+    "tasks": {"title", "status", "when", "end", "ical:extra"},
+}
 
 # Deterministic witness corpus for the ical lens: covers VEVENT, VTODO,
 # status round-trip and the lossless ical:extra path. Adapter-owned attrs
@@ -84,9 +98,11 @@ class Storage(BaseStorage):
         self._lock = SimpleNamespace(locked=None)
         self._meta: dict[str, dict[str, str]] = {
             "calendar": {"D:displayname": "agents-store calendar",
-                         "tag": "VCALENDAR"},
+                         "tag": "VCALENDAR",
+                         "C:supported-calendar-component-set": "VEVENT"},
             "tasks": {"D:displayname": "agents-store tasks",
-                      "tag": "VCALENDAR"},
+                      "tag": "VCALENDAR",
+                      "C:supported-calendar-component-set": "VTODO"},
         }
 
     # ---- per-thread store access ----------------------------------------
@@ -232,6 +248,10 @@ class Collection(BaseCollection):
     def _href_of(self, e: str, view: Mapping) -> str:
         return view.get("ical:href") or f"{e}.ics"
 
+    def _render(self, e: str, view: Mapping) -> str:
+        return self._storage.wrapper.get(
+            e, view, component=COMPONENT.get(self._collection_name))
+
     def _item(self, href: str) -> Optional[Item]:
         e = self._storage._resolve_entity(href)
         if e is None:
@@ -243,7 +263,7 @@ class Collection(BaseCollection):
         return Item(collection_path=self._path, collection=self,
                     href=self._href_of(e, view),
                     last_modified=formatdate(time.time(), usegmt=True),
-                    text=self._storage.wrapper.get(e, view))
+                    text=self._render(e, view))
 
     def get_multi(self, hrefs: Iterable[str]):
         for href in hrefs:
@@ -256,7 +276,7 @@ class Collection(BaseCollection):
             yield Item(collection_path=self._path, collection=self,
                        href=self._href_of(e, view),
                        last_modified=formatdate(time.time(), usegmt=True),
-                    text=self._storage.wrapper.get(e, view))
+                       text=self._render(e, view))
 
     # ---- writes --------------------------------------------------------
 
@@ -272,7 +292,19 @@ class Collection(BaseCollection):
             store.record_refusal(r)
             self._storage.conn.commit()
             raise ValueError(f"ical refusal: {r.reason} ({r.payload})")
-        changes = list(res.changes)
+        # write-set gate: a surface can only change what it can express.
+        # Out-of-projection changes are refused visibly, not silently
+        # dropped; the lawful remainder lands.
+        allowed = WRITE_SETS.get(self._collection_name, set())
+        keep, dropped = [], []
+        for c in res.changes:
+            (keep if c.a in allowed else dropped).append(c)
+        for c in dropped:
+            store.record_refusal(Refusal(
+                wrapper="ical", reason="out-of-projection", e=e, a=c.a,
+                payload=f"{self._collection_name} cannot write {c.a} "
+                        f"({'retract' if not c.added else c.v})"))
+        changes = keep
         if e is None:
             # mint exactly one entity; client UID + href land as data
             changes = [Change(e=None, a=c.a, v=c.v, added=c.added)
@@ -294,7 +326,7 @@ class Collection(BaseCollection):
         return Item(collection_path=self._path, collection=self,
                     href=self._href_of(e, view),
                     last_modified=formatdate(time.time(), usegmt=True),
-                    text=self._storage.wrapper.get(e, view))
+                    text=self._render(e, view))
 
     def delete(self, href: Optional[str] = None) -> None:
         if href is None:
@@ -305,13 +337,14 @@ class Collection(BaseCollection):
         if e is None:
             raise ValueError(f"not found: {href}")
         view = store.view(e)
-        # Retract the round-trip set: the entity loses kind membership and
-        # leaves every projection; all datoms stay in history.
+        # Retract only this surface's write-set: the entity leaves THIS
+        # projection without losing facets another surface owns — deleting
+        # a task's VEVENT in `calendar` keeps the task in `tasks`.
+        # `ical:href`/`ical:client-uid` are provenance, not facet data:
+        # they stay, so a later PUT to the same href rebinds this entity.
+        allowed = WRITE_SETS.get(self._collection_name, set())
         changes = [Change(e=e, a=a, v=view[a], added=False)
-                   for a in _MAPPED_ATTRS if a in view]
-        for a in sorted(view):
-            if a.startswith("ical:"):
-                changes.append(Change(e=e, a=a, v=view[a], added=False))
+                   for a in allowed if a in view]
         result = store.transact(
             changes, wrapper="ical", op="retire", note=href,
         )

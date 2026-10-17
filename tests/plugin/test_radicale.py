@@ -253,13 +253,98 @@ class PluginTest(unittest.TestCase):
             "SELECT COUNT(*) FROM datom WHERE e = ?", (e,)).fetchone()[0]
         self.assertGreaterEqual(n, 4)  # asserted + retracted mapped attrs
         view = self._view(e)
-        for a in ("title", "when", "end", "status", "ical:href", "ical:client-uid"):
+        for a in ("title", "when", "end"):
             self.assertNotIn(a, view)
+        # the href + client uid are provenance, not facet data: kept, so
+        # a later PUT to the same href rebinds this entity.
+        self.assertEqual(view["ical:href"], "x.ics")
+        self.assertEqual(view["ical:client-uid"], "client-uid-1")
         row = self.conn.execute(
             "SELECT op, note FROM tx WHERE id = (SELECT MAX(id) FROM tx)"
         ).fetchone()
         self.assertEqual(row[0], "retire")
         self.assertEqual(row[1], "x.ics")
+
+    # ---- per-surface projection law (BetterBird) -----------------------
+
+    def _put_dual_facet_task(self):
+        """A task WITH a date -> member of both `tasks` and `calendar`."""
+        todo = VTODO.replace(
+            "STATUS:NEEDS-ACTION",
+            "DTSTART:20261205T090000Z\r\nSTATUS:NEEDS-ACTION")
+        status, _, _ = _request(
+            self.app, "PUT", "/test/tasks/t.ics", todo,
+            {"If-None-Match": "*"})
+        self.assertTrue(status.startswith("201"), status)
+        return self.conn.execute(
+            "SELECT e FROM v_current WHERE a = 'ical:href' AND v = 't.ics'"
+        ).fetchone()[0]
+
+    def test_task_with_when_plots_in_calendar_as_vevent(self):
+        e = self._put_dual_facet_task()
+        # tasks view: VTODO, status round-trips
+        status, _, body = _request(self.app, "GET", "/test/tasks/t.ics")
+        self.assertTrue(status.startswith("200"), status)
+        text = body.decode()
+        self.assertIn("BEGIN:VTODO", text)
+        self.assertIn("STATUS:NEEDS-ACTION", text)
+        self.assertIn(f"UID:{e}", text)
+        # calendar view: same entity rendered VEVENT — plotted, no STATUS
+        status, _, body = _request(self.app, "GET", "/test/calendar/t.ics")
+        self.assertTrue(status.startswith("200"), status)
+        text = body.decode()
+        self.assertIn("BEGIN:VEVENT", text)
+        self.assertIn("DTSTART:20261205T090000Z", text)
+        self.assertNotIn("VTODO", text)
+        self.assertNotIn("STATUS", text)
+        self.assertIn(f"UID:{e}", text)  # same canonical id both surfaces
+
+    def test_calendar_put_preserves_task_facet(self):
+        e = self._put_dual_facet_task()
+        # client rewrites it AS VEVENT through the calendar surface
+        ev = VEVENT.replace("client-uid-1", e).replace("Test Event",
+                                                     "Renamed")
+        _, headers, _ = _request(self.app, "GET", "/test/calendar/t.ics")
+        status, _, _ = _request(
+            self.app, "PUT", "/test/calendar/t.ics", ev,
+            {"If-Match": headers["ETag"]})
+        self.assertTrue(status.startswith("204"), status)
+        view = self._view(e)
+        self.assertEqual(view["title"], "Renamed")   # lawful part landed
+        self.assertEqual(view["status"], "open")     # task facet intact
+        # the out-of-projection change was refused visibly, not dropped
+        rows = self.conn.execute(
+            "SELECT reason FROM refusal WHERE wrapper = 'ical' "
+            "AND entity = ?", (e,)).fetchall()
+        self.assertIn(("out-of-projection",), rows)
+        # tasks/ still renders the task
+        status, _, body = _request(self.app, "GET", "/test/tasks/t.ics")
+        self.assertIn("BEGIN:VTODO", body.decode())
+
+    def test_calendar_delete_keeps_task_facet(self):
+        e = self._put_dual_facet_task()
+        status, _, _ = _request(self.app, "DELETE", "/test/calendar/t.ics")
+        self.assertTrue(status.startswith(("200", "204")), status)
+        view = self._view(e)
+        # the event facet is retracted (when = calendar write-set)...
+        self.assertNotIn("when", view)
+        # ...the task facet survives
+        self.assertEqual(view["status"], "open")
+        # gone from the calendar projection, still served by tasks/
+        status, _, _ = _request(self.app, "GET", "/test/calendar/t.ics")
+        self.assertTrue(status.startswith("404"), status)
+        status, _, body = _request(self.app, "GET", "/test/tasks/t.ics")
+        self.assertTrue(status.startswith("200"), status)
+        self.assertIn("BEGIN:VTODO", body.decode())
+
+    def test_component_set_metadata(self):
+        storage = self.app._storage
+        cal = next(iter(storage.discover("/test/calendar/")))
+        tsk = next(iter(storage.discover("/test/tasks/")))
+        self.assertEqual(
+            cal.get_meta("C:supported-calendar-component-set"), "VEVENT")
+        self.assertEqual(
+            tsk.get_meta("C:supported-calendar-component-set"), "VTODO")
 
     # ---- sync token ----------------------------------------------------
 

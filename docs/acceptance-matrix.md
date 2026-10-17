@@ -23,7 +23,7 @@ Megaplan A8 (certification grants, disabling cert → refused): covered by
 `test_fail_cert_no_grants`, `test_uncertified_wrapper_refused`).
 
 Run: `.venv\Scripts\python -m unittest discover -s tests`
-(152 tests: 128 unit + 11 plugin + 13 acceptance; ledger in `docs/AUDIT.md`).
+(156 tests: 128 unit + 15 plugin + 13 acceptance; ledger in `docs/AUDIT.md`).
 
 ## Known POC limits (documented, not bugs)
 
