@@ -1,6 +1,8 @@
 ---
 id: T14
-status: open
+status: claimed
+agent: devin-local
+claimed: 2026-10-17
 depends: []
 owns: [src/agents_store/match.py, tests/unit/test_match.py]
 accepts: []

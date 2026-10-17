@@ -1,8 +1,10 @@
 ---
 id: T13
-status: claimed
+status: done
 agent: devin-local
 claimed: 2026-10-17
+done: 2026-10-17
+commit: c2d2328
 depends: []
 owns: [src/agents_store/wrappers/jsoncal.py, src/agents_store/adapters/jsonfile.py, tests/unit/test_jsoncal.py, tests/unit/test_jsonfile.py]
 accepts: []
