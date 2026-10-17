@@ -109,7 +109,7 @@ class TestCorrectEvolve(unittest.TestCase):
         old = make(self.store, {"body": "v1"})
         new = make(self.store, {"body": "v2"})
         lineage.correct(self.store, new, old, reason="typo fix")
-        self.assertEqual(edges(self.conn, child=new, parent=old), [(new, old, "wasRevisionOf")])
+        self.assertEqual(edges(self.conn, child=new, parent=old), [(new, old, "severs")])
         self.assertEqual(lineage.superseded_by(self.store, old), new)
         self.assertEqual(self.store.view(old)["body"], "v1")  # superseded stays readable
 

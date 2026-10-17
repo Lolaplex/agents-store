@@ -253,11 +253,13 @@ class PluginTest(unittest.TestCase):
             "SELECT COUNT(*) FROM datom WHERE e = ?", (e,)).fetchone()[0]
         self.assertGreaterEqual(n, 4)  # asserted + retracted mapped attrs
         view = self._view(e)
-        # membership attrs and the path datum are retracted;
-        # provenance attrs (client uid, extras) stay recorded
-        for a in ("title", "when", "end", "status", "ical:href"):
+        for a in ("title", "when", "end", "status", "ical:href", "ical:client-uid"):
             self.assertNotIn(a, view)
-        self.assertIn("ical:client-uid", view)
+        row = self.conn.execute(
+            "SELECT op, note FROM tx WHERE id = (SELECT MAX(id) FROM tx)"
+        ).fetchone()
+        self.assertEqual(row[0], "retire")
+        self.assertEqual(row[1], "x.ics")
 
     # ---- sync token ----------------------------------------------------
 

@@ -69,9 +69,14 @@ class TestMediate(unittest.TestCase):
         ).fetchone()
         self.assertEqual(row, ("entity", "html", "contained"))
         prov = self.conn.execute(
-            "SELECT in_refs FROM provenance WHERE mediator_id = ?", (art.mediator_id,)
+            "SELECT in_refs, tx FROM provenance WHERE mediator_id = ?", (art.mediator_id,)
         ).fetchone()
         self.assertEqual(json.loads(prov[0]), [e, "entity"])
+        self.assertIsNotNone(prov[1])
+        self.assertEqual(
+            self.conn.execute("SELECT op FROM tx WHERE id = ?", (prov[1],)).fetchone()[0],
+            "assert",
+        )
 
     def test_no_path_returns_none(self):
         reg = Registry()
