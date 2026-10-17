@@ -35,11 +35,14 @@ class MarkdownWrapper:
     def attrs(self):
         return [
             AttrSpec("title", "text", doc="human title"),
-            AttrSpec("status", "text", doc="open|done"),
-            AttrSpec("when", "instant", doc="start, UTC ISO-8601 Z"),
-            AttrSpec("end", "instant", doc="end, UTC ISO-8601 Z"),
-            AttrSpec("body", "text", doc="markdown body"),
-            AttrSpec("md:path", "text", "many", doc="projection path (adapter-owned)"),
+            AttrSpec("status", "text", doc="task state: open | done"),
+            AttrSpec("when", "instant", doc="start instant, UTC ISO-8601 with Z"),
+            AttrSpec("end", "instant", doc="end instant, UTC ISO-8601 with Z"),
+            AttrSpec("body", "text", doc="long-form text (markdown)"),
+            AttrSpec(
+                "md:path", "text", "many",
+                doc="markdown projection path relative to the folder root",
+            ),
             AttrSpec("md:extra", "json", doc="unmapped frontmatter keys, lossless"),
         ]
 

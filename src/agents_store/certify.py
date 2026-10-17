@@ -15,8 +15,10 @@ import sqlite3
 from dataclasses import dataclass
 from typing import Any, Iterable, Mapping
 
+from .code_hash import code_hash_for_wrapper
 from .contracts import AttrSpec, Change, Wrapper
 from .grant import grant
+from .registry import RegistryError
 
 _LENS_ENTITY = "lens-check"
 
@@ -100,17 +102,40 @@ def check_lens(w: Wrapper, corpus: Iterable[Mapping[str, Any]]) -> LensReport:
 
 
 def register_wrapper(conn: sqlite3.Connection, w: Wrapper) -> None:
-    """Insert the wrapper row and its declared attr vocabulary (idempotent)."""
+    """Insert the wrapper row and its declared attr vocabulary.
+
+    Re-declaring the same id or attr with a different spec is a loud collision."""
     impl = f"{type(w).__module__}.{type(w).__qualname__}"
-    conn.execute(
-        "INSERT OR IGNORE INTO wrapper (id, namespace, impl_ref) VALUES (?, ?, ?)",
-        (w.id, w.namespace, impl),
-    )
-    for spec in w.attrs():
+    row = conn.execute(
+        "SELECT namespace, impl_ref FROM wrapper WHERE id = ?", (w.id,)
+    ).fetchone()
+    if row is None:
         conn.execute(
-            "INSERT OR IGNORE INTO attr (name, value_type, cardinality, doc) VALUES (?, ?, ?, ?)",
-            (spec.name, spec.value_type, spec.cardinality, spec.doc),
+            "INSERT INTO wrapper (id, namespace, impl_ref) VALUES (?, ?, ?)",
+            (w.id, w.namespace, impl),
         )
+    elif row != (w.namespace, impl):
+        raise RegistryError(
+            f"wrapper id collision: {w.id!r} already registered as {row!r}"
+        )
+    for spec in w.attrs():
+        existing = conn.execute(
+            "SELECT value_type, cardinality, doc FROM attr WHERE name = ?",
+            (spec.name,),
+        ).fetchone()
+        if existing is None:
+            conn.execute(
+                "INSERT INTO attr (name, value_type, cardinality, doc) VALUES (?, ?, ?, ?)",
+                (spec.name, spec.value_type, spec.cardinality, spec.doc),
+            )
+        elif (existing[0], existing[1]) != (spec.value_type, spec.cardinality):
+            raise RegistryError(
+                f"attr collision: {spec.name!r} already registered as {existing!r}"
+            )
+        elif existing[2] and spec.doc and existing[2] != spec.doc:
+            raise RegistryError(
+                f"attr collision: {spec.name!r} doc mismatch {existing[2]!r} vs {spec.doc!r}"
+            )
 
 
 def certify(conn: sqlite3.Connection, w: Wrapper, corpus: Iterable[Mapping[str, Any]],
@@ -120,10 +145,12 @@ def certify(conn: sqlite3.Connection, w: Wrapper, corpus: Iterable[Mapping[str, 
     views = list(corpus)
     register_wrapper(conn, w)
     report = check_lens(w, views)
+    digest = code_hash_for_wrapper(w)
     return conn.execute(
-        "INSERT INTO certificate (tier, subject, ref, corpus, result) VALUES (?, ?, ?, ?, ?)",
+        "INSERT INTO certificate (tier, subject, ref, corpus, result, code_hash) "
+        "VALUES (?, ?, ?, ?, ?, ?)",
         (tier, f"wrapper:{w.id}", "check_lens", f"n={len(views)}",
-         "pass" if report.passed else "fail"),
+         "pass" if report.passed else "fail", digest),
     ).lastrowid
 
 

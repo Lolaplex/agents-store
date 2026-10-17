@@ -2,14 +2,21 @@
 import unittest
 
 from agents_store import Change, connect, kinds
+from agents_store.code_hash import code_hash_for_impl_ref
 from agents_store.grant import grant
 from agents_store.store import Store
 
+_IMPL = "agents_store.wrappers.markdown.MarkdownWrapper"
+
 
 def grant_attrs(conn, wid, attrs):
-    conn.execute("INSERT INTO wrapper (id, namespace, impl_ref) VALUES (?, 't', 't')", (wid,))
+    conn.execute(
+        "INSERT INTO wrapper (id, namespace, impl_ref) VALUES (?, 't', ?)", (wid, _IMPL)
+    )
     cert = conn.execute(
-        "INSERT INTO certificate (tier, subject, ref, result) VALUES ('witness', 'w', 'r', 'pass')"
+        "INSERT INTO certificate (tier, subject, ref, result, code_hash) "
+        "VALUES ('witness', 'w', 'r', 'pass', ?)",
+        (code_hash_for_impl_ref(_IMPL),),
     ).lastrowid
     for a in attrs:
         grant(conn, wid, a, cert)

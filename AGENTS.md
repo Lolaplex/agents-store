@@ -31,8 +31,9 @@ Work is broken into self-contained cards under `docs/tasks/` (protocol in `docs/
 
 ## Current state
 
-POC complete through T12: all 12 task cards landed. 144 tests green
-(120 core + 11 plugin + 13 acceptance incl. the agents-calendar
-subprocess witness over real HTTP). Post-POC work lives in
+POC complete through T12: all 12 task cards landed. 152 tests
+(128 unit + 11 plugin + 13 acceptance incl. the agents-calendar
+subprocess witness over real HTTP when installed). Audit ledger:
+`docs/AUDIT.md`. Post-POC work lives in
 `docs/tasks/BACKLOG.md`; the megaplan's bigger aspirations
 (mediator generation, agent-rules projections, koru layer) start there.

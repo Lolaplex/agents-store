@@ -2,20 +2,26 @@
 import unittest
 
 from agents_store import Change, connect
+from agents_store.code_hash import code_hash_for_impl_ref
 from agents_store.grant import grant, is_writable
 from agents_store.store import Store, TxResult
 
+_IMPL = "agents_store.wrappers.markdown.MarkdownWrapper"
+_CODE_HASH = code_hash_for_impl_ref(_IMPL)
 
-def _cert(conn, subject="wrapper:test"):
+
+def _cert(conn, subject="wrapper:test", result="pass"):
     return conn.execute(
-        "INSERT INTO certificate (tier, subject, ref, result) VALUES ('witness', ?, 't', 'pass')",
-        (subject,),
+        "INSERT INTO certificate (tier, subject, ref, result, code_hash) "
+        "VALUES ('witness', ?, 't', ?, ?)",
+        (subject, result, _CODE_HASH),
     ).lastrowid
 
 
 def _wrapper(conn, wid="test"):
     conn.execute(
-        "INSERT INTO wrapper (id, namespace, impl_ref) VALUES (?, 'test', 'test')", (wid,)
+        "INSERT INTO wrapper (id, namespace, impl_ref) VALUES (?, 'test', ?)",
+        (wid, _IMPL),
     )
 
 
@@ -136,7 +142,9 @@ class TestGrantAPI(unittest.TestCase):
 
     def test_grant_requires_pass_cert(self):
         fail_cert = self.conn.execute(
-            "INSERT INTO certificate (tier, subject, ref, result) VALUES ('witness','x','t','fail')"
+            "INSERT INTO certificate (tier, subject, ref, result, code_hash) "
+            "VALUES ('witness','x','t','fail', ?)",
+            (_CODE_HASH,),
         ).lastrowid
         with self.assertRaises(ValueError):
             grant(self.conn, "test", "title", fail_cert)

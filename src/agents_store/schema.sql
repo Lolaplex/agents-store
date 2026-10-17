@@ -18,7 +18,7 @@ CREATE TABLE IF NOT EXISTS tx (
   ts      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
   agent   TEXT,
   wrapper TEXT,
-  op      TEXT NOT NULL CHECK (op IN ('assert','evolve','split','merge','correct')),
+  op      TEXT NOT NULL CHECK (op IN ('assert','evolve','split','merge','correct','retire')),
   note    TEXT
 );
 
@@ -49,7 +49,7 @@ GROUP BY d.e, d.a, d.v;
 CREATE TABLE IF NOT EXISTS lineage (
   child  TEXT    NOT NULL REFERENCES entity(id),
   parent TEXT    NOT NULL REFERENCES entity(id),
-  kind   TEXT    NOT NULL CHECK (kind IN ('wasDerivedFrom','wasRevisionOf','alternateOf','specializationOf')),
+  kind   TEXT    NOT NULL CHECK (kind IN ('wasDerivedFrom','wasRevisionOf','alternateOf','specializationOf','severs')),
   tx     INTEGER NOT NULL REFERENCES tx(id),
   reason TEXT,
   PRIMARY KEY (child, parent, kind, tx)
@@ -68,8 +68,9 @@ CREATE TABLE IF NOT EXISTS certificate (
   subject TEXT NOT NULL,                  -- 'wrapper:md', 'corr:12', 'capability:md-html'
   ref     TEXT NOT NULL,                  -- test id, Lean theorem name, ...
   corpus  TEXT,                           -- e.g. 'seed=1,n=500'
-  result  TEXT NOT NULL CHECK (result IN ('pass','fail')),
-  ts      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+  result    TEXT NOT NULL CHECK (result IN ('pass','fail')),
+  code_hash TEXT NOT NULL DEFAULT '',
+  ts        TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
 );
 
 CREATE TABLE IF NOT EXISTS wrapper (
@@ -131,3 +132,28 @@ CREATE TABLE IF NOT EXISTS refusal (
   reason  TEXT NOT NULL,
   payload TEXT
 );
+
+CREATE TRIGGER IF NOT EXISTS tx_no_update BEFORE UPDATE ON tx
+BEGIN SELECT RAISE(ABORT, 'tx is append-only'); END;
+CREATE TRIGGER IF NOT EXISTS tx_no_delete BEFORE DELETE ON tx
+BEGIN SELECT RAISE(ABORT, 'tx is append-only'); END;
+CREATE TRIGGER IF NOT EXISTS lineage_no_update BEFORE UPDATE ON lineage
+BEGIN SELECT RAISE(ABORT, 'lineage is append-only'); END;
+CREATE TRIGGER IF NOT EXISTS lineage_no_delete BEFORE DELETE ON lineage
+BEGIN SELECT RAISE(ABORT, 'lineage is append-only'); END;
+CREATE TRIGGER IF NOT EXISTS certificate_no_update BEFORE UPDATE ON certificate
+BEGIN SELECT RAISE(ABORT, 'certificate is append-only'); END;
+CREATE TRIGGER IF NOT EXISTS certificate_no_delete BEFORE DELETE ON certificate
+BEGIN SELECT RAISE(ABORT, 'certificate is append-only'); END;
+CREATE TRIGGER IF NOT EXISTS grant_no_update BEFORE UPDATE ON grant_
+BEGIN SELECT RAISE(ABORT, 'grant_ is append-only'); END;
+CREATE TRIGGER IF NOT EXISTS grant_no_delete BEFORE DELETE ON grant_
+BEGIN SELECT RAISE(ABORT, 'grant_ is append-only'); END;
+CREATE TRIGGER IF NOT EXISTS refusal_no_update BEFORE UPDATE ON refusal
+BEGIN SELECT RAISE(ABORT, 'refusal is append-only'); END;
+CREATE TRIGGER IF NOT EXISTS refusal_no_delete BEFORE DELETE ON refusal
+BEGIN SELECT RAISE(ABORT, 'refusal is append-only'); END;
+CREATE TRIGGER IF NOT EXISTS provenance_no_update BEFORE UPDATE ON provenance
+BEGIN SELECT RAISE(ABORT, 'provenance is append-only'); END;
+CREATE TRIGGER IF NOT EXISTS provenance_no_delete BEFORE DELETE ON provenance
+BEGIN SELECT RAISE(ABORT, 'provenance is append-only'); END;

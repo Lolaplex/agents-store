@@ -14,6 +14,7 @@ are appended, history grows, identity stays).
 """
 from __future__ import annotations
 
+import os
 import sys
 from pathlib import Path
 
@@ -33,8 +34,14 @@ from agents_store.store import Store  # noqa: E402
 from agents_store.wrappers.ical import ICalWrapper  # noqa: E402
 from agents_store.wrappers.markdown import MarkdownWrapper  # noqa: E402
 
-DB = ROOT / "scratch" / "demo.sqlite"
-NOTES = ROOT / "scratch" / "notes"
+def _scratch_root() -> Path:
+    raw = os.environ.get("AGENTS_STORE_SCRATCH")
+    return Path(raw) if raw else ROOT / "scratch"
+
+
+def _paths() -> tuple[Path, Path]:
+    root = _scratch_root()
+    return root / "demo.sqlite", root / "notes"
 MD_CORPUS = [
     {"title": "t", "body": "b"},
     {"title": "t", "status": "open", "body": "b"},
@@ -45,9 +52,10 @@ MD_CORPUS = [
 
 
 def main() -> None:
-    DB.parent.mkdir(exist_ok=True)
-    NOTES.mkdir(exist_ok=True)
-    conn = connect(str(DB))
+    db, notes = _paths()
+    db.parent.mkdir(parents=True, exist_ok=True)
+    notes.mkdir(parents=True, exist_ok=True)
+    conn = connect(str(db))
     store = Store(conn)
     mdw, icw = MarkdownWrapper(), ICalWrapper()
     cert = certify(conn, mdw, MD_CORPUS)
@@ -61,7 +69,7 @@ def main() -> None:
     reg.register_capability(EntityHtml())
 
     # 1. entity: reuse via the anchor file if it exists (idempotent)
-    anchor = NOTES / "demo-entity.md"
+    anchor = notes / "demo-entity.md"
     e = None
     if anchor.exists():
         fid = mdw.peek_id(anchor.read_text(encoding="utf-8"))
@@ -76,13 +84,17 @@ def main() -> None:
         ], wrapper="store", note="demo create").entity
 
     # 2. markdown projection
-    rep = folder.sync(store, str(NOTES), mdw)
+    rep = folder.sync(store, str(notes), mdw)
     view = store.view(e)
     path = view.get("md:path")
-    md_file = NOTES / list(path)[0] if isinstance(path, tuple) else NOTES / str(path)
+    md_file = notes / list(path)[0] if isinstance(path, tuple) else notes / str(path)
     print(f"entity   : {e}")
     print(f"kinds    : {sorted(kinds.of(conn, e))}")
-    print(f"md file  : {md_file.relative_to(ROOT)}")
+    try:
+        md_rel = md_file.relative_to(ROOT)
+    except ValueError:
+        md_rel = md_file
+    print(f"md file  : {md_rel}")
     print("--- markdown ---")
     print(md_file.read_text(encoding="utf-8"))
 
@@ -92,7 +104,7 @@ def main() -> None:
     nxt = "done" if cur == "open" else "open"
     md_file.write_text(text.replace(f"status: {cur}", f"status: {nxt}"),
                        encoding="utf-8")
-    folder.sync(store, str(NOTES), mdw)
+    folder.sync(store, str(notes), mdw)
     print(f"status   : {cur} -> {store.view(e)['status']} (via file edit)")
 
     # 4. every representation carries the same id

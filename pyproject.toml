@@ -13,6 +13,13 @@ authors = [{ name = "Lolaplex" }]
 requires-python = ">=3.11"
 dependencies = []
 
+[project.optional-dependencies]
+acceptance = [
+  "agents-calendar @ git+https://github.com/Lolaplex/agents-calendar.git",
+  "radicale",
+  "vobject",
+]
+
 [project.entry-points."agents_store.wrappers"]
 # Extension point: third-party packages register Wrapper factories here.
 

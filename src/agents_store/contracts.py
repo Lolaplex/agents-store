@@ -9,7 +9,7 @@ from typing import Any, Literal, Mapping, Protocol, Sequence, runtime_checkable
 
 ValueType = Literal["text", "instant", "int", "bool", "ref", "json"]
 Cardinality = Literal["one", "many"]
-TxOp = Literal["assert", "evolve", "split", "merge", "correct"]
+TxOp = Literal["assert", "evolve", "split", "merge", "correct", "retire"]
 CapabilityMode = Literal["render", "lens"]
 
 # An entity as a wrapper sees it: attr name -> value (cardinality 'many' -> tuple of values).
