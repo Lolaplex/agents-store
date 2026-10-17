@@ -23,7 +23,7 @@ Megaplan A8 (certification grants, disabling cert → refused): covered by
 `test_fail_cert_no_grants`, `test_uncertified_wrapper_refused`).
 
 Run: `.venv\Scripts\python -m unittest discover -s tests`
-(143 tests: 120 core + 11 plugin + 12 acceptance).
+(152 tests: 128 unit + 11 plugin + 13 acceptance; ledger in `docs/AUDIT.md`).
 
 ## Known POC limits (documented, not bugs)
 
@@ -36,5 +36,5 @@ Run: `.venv\Scripts\python -m unittest discover -s tests`
   ones loudly; delta-sync is BACKLOG.
 - Collection metadata writes are in-memory per process (meta-projection =
   BACKLOG).
-- Deleted entities keep provenance attrs (`ical:client-uid`, `ical:extra`)
-  — history is append-only by design.
+- Retire retracts adapter-owned `ical:*` attrs from the current view;
+  datoms remain in history (append-only by design).
