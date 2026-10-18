@@ -29,3 +29,18 @@ python3 -m venv .venv
 ```
 
 Latest measured count: **152** (128 unit + 11 plugin + 13 acceptance) at `git rev-parse HEAD` on this branch.
+
+## Manual verification (2026-10-18)
+
+- **Verified by:** Fabian Schindler, by hand.
+- **Tree:** `main` @ `04acfaf987cbaba2a0c7b8f87a75c35ee638997b` ("docs: pin frag 0014 to 42fc1ce").
+- **Client:** Thunderbird against the Radicale projection. This is the manual A1–A6 check
+  from MEGAPLAN §5.9.
+- **Covered additionally:** in Fabian's words, "additions … with a json schema and
+  mediator". In this tree that's the jsoncal wrapper (T13) and the generated mediator
+  with mediated write-back (T14–T16, MEGAPLAN §6.1).
+- **Result:** pass. Fabian's report: the POC goal is met.
+- **Consequence:** this tree is the v0 freeze candidate. The tag is created by hand on
+  this SHA. After that, v0 takes only fixes; new work follows `docs/ROADMAP.md`.
+- **Gap:** no automated witness covers the Thunderbird UI. This row is Fabian's
+  observation, not a test result.
