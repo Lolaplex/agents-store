@@ -8,7 +8,7 @@ from agents_store.more.events import Event
 from agents_store.more.log import EventLog, Refused
 from agents_store.more.status import derive
 from agents_store.store import Store
-from tests.more.helpers import FAB, adr, decision
+from tests.more.helpers import FAB, adr
 
 
 class DecisionArtifact(unittest.TestCase):

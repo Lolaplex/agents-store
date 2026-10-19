@@ -1,6 +1,6 @@
 # 0015 more-store integration
 
-- commit: 55fb9b6
+- commit: 7a02d7d
 - task: T17
 - claim: MORe events co-locate with the entity store; ADR `decision` kind + `latest_live_decision`; 114 MORe tests pass.
 - evidence:

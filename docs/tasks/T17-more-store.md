@@ -67,4 +67,4 @@ See `docs/frags/0015-more-store.md`.
 
 ## commit
 
-55fb9b6
+7a02d7d
