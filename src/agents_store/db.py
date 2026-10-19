@@ -82,6 +82,9 @@ def connect(path: str | Path = ":memory:") -> sqlite3.Connection:
         conn.execute("PRAGMA journal_mode = WAL")
     conn.executescript(_sql("schema.sql"))
     conn.executescript(_sql("seed.sql"))
+    conn.executescript(
+        resources.files("agents_store.more").joinpath("schema.sql").read_text(encoding="utf-8")
+    )
     _migrate_v2(conn)
     if conn.execute("PRAGMA user_version").fetchone()[0] < SCHEMA_VERSION:
         conn.execute(f"PRAGMA user_version = {SCHEMA_VERSION}")

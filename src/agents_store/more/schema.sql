@@ -1,5 +1,5 @@
 -- MORe kernel event log. Same conventions as agents-store v0 schema.sql:
--- idempotent DDL, append-only via triggers, refusals recorded with a reason.
+-- idempotent DDL, append-only via triggers, refusals in more_refusal.
 
 CREATE TABLE IF NOT EXISTS event (
   seq      INTEGER PRIMARY KEY AUTOINCREMENT,   -- log order
@@ -29,7 +29,7 @@ BEGIN SELECT RAISE(ABORT, 'event_subject is append-only'); END;
 CREATE TRIGGER IF NOT EXISTS event_subject_no_delete BEFORE DELETE ON event_subject
 BEGIN SELECT RAISE(ABORT, 'event_subject is append-only'); END;
 
-CREATE TABLE IF NOT EXISTS refusal (
+CREATE TABLE IF NOT EXISTS more_refusal (
   id        INTEGER PRIMARY KEY AUTOINCREMENT,
   ts        TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
   violation TEXT NOT NULL,
