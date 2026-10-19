@@ -6,9 +6,16 @@ INSERT OR IGNORE INTO attr (name, value_type, cardinality, doc) VALUES
   ('when',    'instant', 'one',  'start instant, UTC ISO-8601 with Z'),
   ('end',     'instant', 'one',  'end instant, UTC ISO-8601 with Z'),
   ('status',  'text',    'one',  'task state: open | done'),
-  ('md:path', 'text',    'many', 'markdown projection path relative to the folder root');
+  ('md:path', 'text',    'many', 'markdown projection path relative to the folder root'),
+  ('more:type',    'text',    'one',  'MORe event type'),
+  ('more:actor',   'text',    'one',  'MORe event actor'),
+  ('more:at',      'instant', 'one',  'MORe event timestamp (UTC ISO-8601 with Z)'),
+  ('more:subject', 'text',    'many', 'MORe subject identifiers'),
+  ('more:pin',     'text',    'many', 'version pin as entity@tx'),
+  ('more:body',    'json',    'one',  'MORe type-specific body');
 
 INSERT OR IGNORE INTO kind (name, required, optional, derivations) VALUES
   ('event', '["when"]',   '["end","title"]',  '[{"attr":"end","from":["when"],"rule":"plus_1h"}]'),
   ('task',  '["status"]', '["when","title"]', '[]'),
-  ('note',  '["body"]',   '["title"]',        '[]');
+  ('note',  '["body"]',   '["title"]',        '[]'),
+  ('more-event', '["more:type","more:actor"]', '["more:at","more:subject","more:pin","more:body"]', '[]');

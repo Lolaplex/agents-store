@@ -4,6 +4,10 @@ update, no delete; ending anything is an event).
 Each row carries a hash chain: digest = sha256(prev || id || canonical
 envelope). verify() recomputes it, so an edit or removal made below the
 triggers (raw file access) shows up as event_mutated.
+
+When opened on a store database (``entity`` table present), each admitted
+event is also materialized as an entity with the same id in one atomic
+transaction.
 """
 from __future__ import annotations
 
@@ -18,6 +22,7 @@ from agents_store.ids import mint
 from .checks import EVENT_MUTATED, Violation, check_event
 from .events import Event
 from .profile import Profile, load_profile
+from .store_bridge import materialize_entity, materialize_lineage, open_tx, store_backed
 
 SCHEMA = Path(__file__).resolve().parent / "schema.sql"
 
@@ -38,14 +43,32 @@ def _digest(prev: str, event_id: str, envelope: bytes) -> str:
     return h.hexdigest()
 
 
+def _apply_schema(conn: sqlite3.Connection) -> None:
+    conn.executescript(SCHEMA.read_text(encoding="utf-8"))
+
+
 class EventLog:
-    def __init__(self, path: str | Path = ":memory:", profile: Profile | None = None):
+    def __init__(
+        self,
+        path: str | Path = ":memory:",
+        profile: Profile | None = None,
+        *,
+        conn: sqlite3.Connection | None = None,
+    ):
         self.profile = profile or load_profile()
-        self.conn = sqlite3.connect(str(path), isolation_level=None)
-        self.conn.executescript(SCHEMA.read_text(encoding="utf-8"))
+        if conn is not None:
+            self.conn = conn
+            self._owns_conn = False
+            _apply_schema(conn)
+        else:
+            self.conn = sqlite3.connect(str(path), isolation_level=None)
+            self._owns_conn = True
+            _apply_schema(self.conn)
+        self._integrated = store_backed(self.conn)
 
     def close(self) -> None:
-        self.conn.close()
+        if self._owns_conn:
+            self.conn.close()
 
     def _head(self) -> str:
         row = self.conn.execute("SELECT digest FROM event ORDER BY seq DESC LIMIT 1").fetchone()
@@ -60,7 +83,7 @@ class EventLog:
         if violations:
             for v in violations:
                 self.conn.execute(
-                    "INSERT INTO refusal (violation, detail, payload) VALUES (?, ?, ?)",
+                    "INSERT INTO more_refusal (violation, detail, payload) VALUES (?, ?, ?)",
                     (v.id, v.detail, payload))
             raise Refused(violations)
         eid = mint()
@@ -68,6 +91,10 @@ class EventLog:
         try:
             prev = self._head()
             digest = _digest(prev, eid, event.canonical())
+            tx_id: int | None = None
+            if self._integrated:
+                tx_id = open_tx(self.conn, event)
+                materialize_entity(self.conn, eid, tx_id, event)
             seq = self.conn.execute(
                 "INSERT INTO event (id, type, actor, at, envelope, prev, digest) "
                 "VALUES (?, ?, ?, ?, ?, ?, ?)",
@@ -75,6 +102,8 @@ class EventLog:
             self.conn.executemany(
                 "INSERT INTO event_subject (event_id, subject) VALUES (?, ?)",
                 [(eid, s) for s in dict.fromkeys(event.subjects)])
+            if self._integrated and tx_id is not None:
+                materialize_lineage(self.conn, eid, tx_id, event)
             self.conn.execute("COMMIT")
         except BaseException:
             self.conn.execute("ROLLBACK")
@@ -102,7 +131,8 @@ class EventLog:
         return self._row(row) if row else None
 
     def refusals(self) -> list[tuple[str, str]]:
-        return list(self.conn.execute("SELECT violation, detail FROM refusal ORDER BY id"))
+        return list(self.conn.execute(
+            "SELECT violation, detail FROM more_refusal ORDER BY id"))
 
     def verify(self) -> list[Violation]:
         """Recompute the hash chain. Any break is event_mutated."""

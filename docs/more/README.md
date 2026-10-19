@@ -9,7 +9,19 @@ Porting contract and Lean reference: **`kernel/More/PORTING.md`** in more-framew
 - Event log, checks, derived status, gates, JWF board state, relations, readiness, hierarchy lint, compliance projection, cut-over profile
 - Companion unit tests in `tests/more/`
 
-## Still owned by the board (agents-store integration)
+## Store integration (T17)
 
-- Persisting the MORe event log into the entity store (datoms), not only `:memory:` / local sqlite
+`db.connect()` applies both the entity-store schema and `more/schema.sql` in one
+file. `EventLog(conn=store_conn)` detects the `entity` table and, on each
+admitted append, mints one ULID used as both `event.id` and `entity.id`, writes
+`more:*` datoms under an internal `assert` tx, and records `wasRevisionOf`
+edges for supersession/overrule events. Refused envelopes go to `more_refusal`
+only (store `refusal` is for wrapper grant denials).
+
+Standalone `EventLog(:memory:)` or a MORe-only sqlite file still works for the
+companion tests — no entity materialization without the store schema.
+
+## Still owned by the board
+
 - Board UI projection of JWF / work-item state from store-backed logs
+- CLI/MCP surface for MORe append (T18)
