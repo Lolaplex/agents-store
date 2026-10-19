@@ -63,4 +63,4 @@ See `docs/frags/0015-more-store.md`.
 
 ## commit
 
-(pending land)
+55fb9b6

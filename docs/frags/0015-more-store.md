@@ -1,6 +1,6 @@
 # 0015 more-store integration
 
-- commit: (see PR)
+- commit: 55fb9b6
 - task: T17
 - claim: MORe events co-locate with the entity store; admitted events share id with entities; refusals use `more_refusal`; 110 MORe tests pass.
 - evidence:
