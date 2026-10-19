@@ -1,0 +1,37 @@
+{
+  "_doc": "Implementation settings for the reference kernel. Everything domain-level (levels, questions, the JWF status model) is read from lean-model/kernel-proposal.json; this file holds only the knobs the spec leaves open. Each key names the spec gap it fills.",
+  "done_requires_acceptance": true,
+  "_done_requires_acceptance": "more-lean-model.md §9: 'done = inclusion + gate-accepted passing verification' vs. the state order verified -> accepted -> released(=done). true = released needs the business-acceptance decision too.",
+  "status_keys": ["status", "state", "derived_status", "workflow_state", "jira_status", "done", "ready", "released", "accepted"],
+  "status_event_types": ["status", "set_status", "status_change", "transition", "move_to_done"],
+  "acceptance_values": ["accepted", "approved", "abgenommen", "in abnahme", "freigegeben", "akzeptiert"],
+  "acceptance_states": ["In Abnahme", "Abgenommen"],
+  "decision_statuses": ["open", "decided"],
+  "verification_results": ["pass", "fail", "deviation"],
+  "verification_stages": ["test", "production", "review"],
+  "_verification_stages": "review is a kernel addition (more-lean-model.md §12a): a QG1 guard check, never a test verification.",
+  "validator_methods": ["validator", "schema_validation"],
+  "_validator_methods": "verification methods that count as validation for validated_by claims (Lean Profile.validatorMethods).",
+  "relevant": {
+    "verification": ["value_range", "optionality", "cardinality", "dependency"],
+    "acceptance": ["meaning", "value_range", "optionality", "cardinality", "dependency"],
+    "operations": ["value_range", "ordering"]
+  },
+  "_relevant": "invariants relevant per purpose for purpose-indexed equivalence (MP p.8 C.1). The spec leaves them per organisation; the default uses the ELSTER field-rule invariants (MP B.2: Wertebereich, Pflicht / Optionalität, Kardinalität, Abhängigkeitsbedingung) and adds meaning for acceptance and ordering for operations (Lean Profile.relevant; profile choice, no source).",
+  "roles": {},
+  "_roles": "board roles per principal (JWF p.9: PO/Fachbereich, Entwicklung, Test/Abnahme, Release/Team). Per organisation; empty by default (Lean Profile.roles).",
+  "acceptor_roles": ["PO/Fachbereich", "Test/Abnahme"],
+  "_acceptor_roles": "roles that may take the acceptance decision. JWF p.9: 'fachliche Abnahme' (PO / Fachbereich), 'Abnahmeentscheidung' (Test / Abnahme). Must equal jira_status_model.acceptance.default_acceptor_roles (Lean Profile.acceptorRoles).",
+  "placeholders": ["", "tbd", "tba", "todo", "n/a", "na", "-", "--", "...", "\u2026", "?", "wip", "lorem ipsum", "xxx"],
+  "level_aliases": {
+    "Fachgebiet": ["fachgebiet", "domain", "domain overview"],
+    "Anwendungsfall": ["uc", "use case", "use cases", "anwendungsfall", "goal", "ziel"],
+    "BP": ["bp", "business process", "process", "prozess", "ablauf"],
+    "CM": ["cm", "domain model", "fachmodell", "glossary", "glossar", "data model", "datenmodell"],
+    "UI": ["ui", "user interface", "oberfl\u00e4che", "screen", "maske"],
+    "API": ["api", "interface", "schnittstelle"],
+    "TC": ["tc", "test case", "test cases", "testfall", "testf\u00e4lle"],
+    "AC": ["ac", "acceptance", "acceptance criteria", "akzeptanzkriterien", "abnahme", "abnahmekriterien"],
+    "DEC": ["dec", "decision", "decisions", "entscheidung", "entscheidungen", "rationale", "begr\u00fcndung"]
+  }
+}

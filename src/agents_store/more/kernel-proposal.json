@@ -1,0 +1,1132 @@
+{
+  "version": 4,
+  "status": "proposal v4 (not pushed): v3 + append-only decision/evidence events as core primitives (Koru git practice + BEL Nachweis/Entscheidung). v3 kept as kernel-proposal.v3.json",
+  "description": "Lean MORe kernel. One invariant organises everything: every artifact is held exactly once; everything else is a pointer or a lossless, regenerable projection. Relations, gates, lifecycle and profiles are layered on the four core primitives.",
+  "sources": {
+    "HOME": "more-framework.org home: 'Eine Spezifikation. Viele Ableitungen. Keine zweite Wahrheit.'",
+    "IA": "Informationsarchitektur fuer moderne Projekte v1.4 (2026-07-13)",
+    "PI": "Wenn Skalierung Informationsinseln erzeugt v1.0 (2026-07-25)",
+    "BEL": "MORe unter Belastung v1.2 (Sept 2026)",
+    "ELSTER": "Eine Spezifikation. Viele Artefakte. v1.2 (2026-08-14)",
+    "KI": "Informationsarchitektur KI v1.0 (2026-07-28)",
+    "MAN": "MORe Manifest DE (2026-08-24) / site /framework",
+    "REG": "site /reguliertes-umfeld",
+    "ZOHO": "Beispiel ZOHO ONE Meeting-Schaltflaeche V8.0 (Confluence export v.9, 2026-07-14, /download/beispiele/)",
+    "DEMO": "more-framework.org/demo/index.html bundle assets/index-Cy1hzhS9.js (UC-042 Adressaenderung, R-17)",
+    "US": "Whitepaper User Stories im regulierten Umfeld (DE/EN, 2026-07-26)",
+    "inventory": "see /workspace/more/sources.md",
+    "KORU": "korulang/koru git log @24c1538c0 (3,756 commits) + hooks/commit-msg.cjs + membrane SKILL; see /workspace/koru-distill/DISCIPLINE.md §9-10",
+    "WPUS": "Why User Stories Are Not Enough in Regulated Environments (EN, 2026-07-26)",
+    "LEI": "site /leistungen (fetched 2026-10-17)",
+    "JWF": "Neutralisiertes Jira Workflow Statusmodell (MORe_Jira_Workflow_Statusmodell_neutralisiert_v1.0.pdf, 13 pp., 2026-08-20, unpublished)",
+    "MP": "2026 - Maßnahmenplan, Konsequenzen aus Fabians Feedback (2026-09-06, unpublished)"
+  },
+  "invariant": {
+    "id": "single_home",
+    "statement": "Every artifact exists exactly once, at one leading place, under one stable id. Anything else that shows its content is either a pointer to artifact@version or a declared projection that can be regenerated from its sources without loss. A hand-maintained copy or a reinterpretation that drops properties is a violation, not a feature.",
+    "quotes": [
+      {
+        "src": "HOME",
+        "text": "Eine Spezifikation. Viele Ableitungen. Keine zweite Wahrheit. ... Fachliche Regeln werden einmal gefuehrt."
+      },
+      {
+        "src": "IA §6 Merksatz",
+        "text": "jede Information genau einmal und am richtigen Ort. Dokumente sind Sichten auf Informationen, nicht ihr Speicherort."
+      },
+      {
+        "src": "ELSTER §1",
+        "text": "Jede fachliche Information wird genau einmal definiert, versioniert, entschieden und mit ihren Ableitungen verbunden."
+      },
+      {
+        "src": "ELSTER §1",
+        "text": "[Repraesentationen] duerfen nicht unabhaengig voneinander zu neuen Wahrheiten werden."
+      },
+      {
+        "src": "ELSTER §13",
+        "text": "Eine Spezifikation. Viele erzeugte Repraesentationen. Eine eigenstaendig evolvierbare Implementierung. Aber keine zweite Wahrheit."
+      },
+      {
+        "src": "ELSTER §5.2",
+        "text": "Das Gegenmittel ist nicht mehr Dokumentation. Das Gegenmittel ist weniger doppelte Information."
+      },
+      {
+        "src": "BEL §3",
+        "text": "Dokumente und andere Publikationsformen werden aus gefuehrten Informationen erzeugt oder referenzieren sie, statt eine zweite Wahrheit zu bilden."
+      },
+      {
+        "src": "BEL §5.2.1",
+        "text": "Eine Ableitung ist nur dann belastbar, wenn die fuer ihren Zweck relevanten fachlichen Invarianten erhalten bleiben und dies ueberpruefbar ist."
+      },
+      {
+        "src": "PI Leitprinzip 3/6",
+        "text": "Beziehungen statt Kopien ... Publikationen ... aus dem aktuellen Informationsstand erzeugt - nicht separat fortgeschrieben."
+      },
+      {
+        "src": "ELSTER Phase D",
+        "text": "Generierte Dateien erhalten einen Versions- und Herkunftsnachweis. Manuelle Aenderungen an generierten Artefakten werden im Build erkannt."
+      }
+    ]
+  },
+  "core_primitives": {
+    "artifact": {
+      "meaning": "The only place content is authored. Single home, stable id, versioned.",
+      "fields": {
+        "id": "stable, never reused; PREFIX-NNN for MORe types (IA §8.1), rule/field ids for spec elements (ELSTER §6.1)",
+        "type": "one of artifact_types",
+        "home": "the leading place (system + locator); exactly one (BEL §3 'fuehrender Ort')",
+        "version": "monotonic; every content change creates a new version",
+        "content": "authored payload; only present at home",
+        "owner": "accountable person/role (REG Verantwortung)",
+        "state": "lifecycle state (see lifecycle)"
+      },
+      "rules": [
+        "no two artifacts may carry the same content-bearing field for the same fact (detect by content hash / declared fact keys)",
+        "an artifact held in an external system (git, GitHub, model registry) is NOT copied in; the board holds a pointer"
+      ],
+      "examples": {
+        "spec_field": {
+          "src": "ELSTER §7.1",
+          "shape": {
+            "field": "Kz84",
+            "meaning": "Bemessungsgrundlage fuer andere Leistungen",
+            "type": "integer",
+            "optional": true,
+            "pairedWith": "Kz85",
+            "serializationOrder": 42,
+            "sourceRuleIds": [
+              110085072,
+              110085206
+            ]
+          }
+        },
+        "spec_rule": {
+          "src": "ELSTER §7.2",
+          "shape": {
+            "rule": "UStVA_Kz84_85_Gemeinsam",
+            "if": "oneOf(Kz84,Kz85) is present",
+            "then": "both(Kz84,Kz85) must be present",
+            "severity": "error",
+            "test": "generated"
+          }
+        },
+        "demo_rule": {
+          "src": "DEMO",
+          "shape": {
+            "id": "R-17",
+            "text": "PLZ und Ort muessen zueinander passen",
+            "home": "Spezifikation (Fachbereich)"
+          }
+        }
+      },
+      "field_rules": [
+        "separate meaning, type, optionality, dependencies and technical serialization (ELSTER Phase B, §7.3)",
+        "technical restrictions (e.g. xs:sequence order) are held as a technical derivation attribute (serializationOrder), never mixed into the business rule (ELSTER §7.3: 'Technische Restriktionen duerfen die Fachsemantik beeinflussen, aber sie duerfen sie nicht ersetzen')",
+        "preserve information states: absent != 'null' != 0.00 (ELSTER §2.2, §8.1); normalisation must not destroy them"
+      ]
+    },
+    "pointer": {
+      "meaning": "Reference to artifact@version. Carries no content of its target. A pointer is how one artifact uses another.",
+      "fields": {
+        "target_id": "artifact id or external locator",
+        "target_version": "pinned version / commit sha / revision; 'floating' only allowed for navigation pointers and must be marked",
+        "role": "relation type (see relations) or 'nav'",
+        "owner": "who asserted it",
+        "reason": "why",
+        "valid_from": "timestamp",
+        "valid_to": "timestamp or null; ending a pointer is a recorded change, never a hard delete"
+      },
+      "rules": [
+        "an unpinned pointer claims every version of A fits every version of B (BEL §9) - only nav pointers may float",
+        "a pointer whose target version is superseded becomes 'suspect' until re-confirmed"
+      ],
+      "src": "BEL §9 'Ein Link ohne Versionsbezug behauptet stillschweigend, dass jede Fassung von A zu jeder Fassung von B passt.'"
+    },
+    "projection": {
+      "meaning": "A declared, pure derivation from source artifacts at pinned versions. Views, documents, generated schemas, caches, indexes, counts and mirrors are all projections.",
+      "fields": {
+        "id": "projection id",
+        "sources": "list of pointers (artifact@version)",
+        "function": "named, versioned derivation (code ref + version)",
+        "preserves": "list of properties that must survive (invariants), e.g. meaning, type, optionality, ordering, completeness",
+        "output_hash": "hash of last generated output",
+        "generated_at": "timestamp",
+        "provenance": "sources + function version embedded in output"
+      },
+      "rules": [
+        "pure: same sources@versions + same function version => same output",
+        "regenerable: may be deleted and rebuilt at any time with no information loss",
+        "never hand-edited: edits go to the source artifact, then the projection is regenerated (ELSTER §13)",
+        "lossy is allowed only if declared: dropped properties must not be in 'preserves', and the projection must not be used where they matter",
+        "a projection cannot be the source of another artifact's content; only of other projections"
+      ],
+      "src": "ELSTER §6, §12, Phase D; BEL §5.2.1; IA §6",
+      "derivable_set": {
+        "src": "ELSTER §6.2, §6.3",
+        "kinds": [
+          "xsd_or_json_schema",
+          "field_catalogue_and_rule_docs",
+          "validators_with_stable_rule_ids",
+          "tests_and_boundary_tests",
+          "mapping_and_implementation_parameters",
+          "release_and_change_docs_from_version_and_decision_history",
+          "traceability_evidence_reports"
+        ],
+        "excluded": "application code ('model-driven bei der Spezifikation, nicht generator-driven bei der Implementierung')",
+        "note": "'Generieren heisst: Eine erzeugte Repraesentation darf nicht manuell zur zweiten Wahrheit werden.'"
+      },
+      "ordering_example": {
+        "src": "ELSTER §3.4, §7.3",
+        "text": "XML generator sorts deterministically by serializationOrder; XSD sequence is a projection property, not business semantics"
+      }
+    },
+    "drift_check": {
+      "meaning": "Mechanical test that the invariant holds. Any violation fails CI / blocks the gate.",
+      "violations": [
+        {
+          "id": "copy_diverged",
+          "test": "a copy of artifact content exists outside its home and differs from home@version"
+        },
+        {
+          "id": "copy_exists",
+          "test": "a copy exists outside its home at all (even if equal) and is not a declared projection"
+        },
+        {
+          "id": "projection_stale",
+          "test": "projection.sources point at superseded versions"
+        },
+        {
+          "id": "projection_hand_edited",
+          "test": "regenerate(projection) != stored output (output_hash mismatch)"
+        },
+        {
+          "id": "projection_drops_preserved",
+          "test": "property listed in 'preserves' differs between source and output"
+        },
+        {
+          "id": "pointer_unpinned",
+          "test": "non-nav pointer without target_version"
+        },
+        {
+          "id": "pointer_dangling",
+          "test": "target id/version does not exist"
+        },
+        {
+          "id": "pointer_suspect",
+          "test": "target superseded since pointer was confirmed"
+        }
+      ],
+      "maps_to_source_drift_kinds": {
+        "Definitionsdrift": "projection_drops_preserved",
+        "Regeldrift": "copy_diverged / projection_stale",
+        "Formatdrift": "projection_drops_preserved",
+        "Nachweisdrift": "pointer_unpinned / pointer_dangling"
+      },
+      "src": "ELSTER §5.2 (four drift kinds), Phase D ('CI prueft Schema, Regeln, Regressionen und Artefaktdiffs'); BEL §10.4",
+      "validation_stages": {
+        "src": "ELSTER §9 (six stages, all tied to the same spec element/rule ids)",
+        "stages": [
+          "source_and_mapping (absent/null/value classified; each source column -> exactly one field)",
+          "field (type, length, range, enum, decimals)",
+          "business_plausibility (paired fields, conditional, Kz10 null rules)",
+          "schema_and_serialization (namespace, xs:sequence order, cardinality)",
+          "integration (actual acceptance by target; deviations to local validator recorded)",
+          "regression_golden_files (versioned valid/invalid examples; spec change yields artifact diff)"
+        ],
+        "rule": "a production-accepted example file is not a hidden spec; it becomes a regression test with known provenance and scope (ELSTER §9)"
+      },
+      "impact_analysis": {
+        "src": "DEMO #wirkung; PI Leitprinzip 5",
+        "text": "changing a rule yields the concrete affected chain (spec section, story, test cases, release evidence -> 're-check'), not a list of possibly stale documents",
+        "maps_to": "pointer_suspect propagation over reverse pointers"
+      },
+      "runtime_divergence": {
+        "src": "ELSTER §4",
+        "text": "accepted runtime behaviour may diverge from strict local validation (Kz84/85 order accepted for months, rejected by xmllint). Record as evidence with result 'objected'/'deviation'; do not 'fix' by copying behaviour into code"
+      },
+      "violations_added_v4": [
+        "status_hand_set",
+        "verification_unpinned",
+        "supersession_unlinked",
+        "event_mutated"
+      ]
+    },
+    "event": {
+      "meaning": "An immutable, append-only record that something was decided, verified, included, superseded, overruled or moved. Events are the only write path for state changes; artifact state, pointer validity, status and PR/issue views are projections (folds) over events.",
+      "envelope": {
+        "id": "content hash or minted id; never reused",
+        "type": "decision|verification|inclusion|supersession|overrule|move",
+        "actor": "DID of the asserting party; on_behalf_of for agents",
+        "at": "author time",
+        "pinned_against": "artifact@version / commit / baseline the claim was made against (required)",
+        "subjects": "artifact ids",
+        "reason": "why; required for supersession, overrule",
+        "supersedes": "link(s) to superseded event or artifact@version",
+        "signals": "world-model signals or explicit 'acknowledged-none'",
+        "provenance": "session/source"
+      },
+      "types": {
+        "decision": {
+          "extra": [
+            "decided_by",
+            "options?",
+            "status: open|decided"
+          ],
+          "src": [
+            "BEL §7.2-7.3.2: Entscheidung als eigenes Objekt; 'Eine offene Entscheidung ist keine Notiz. Sie ist ein fehlender Informationsstand.'; fields 'Datum der Entscheidung', 'Entschieden von'; Open => not Ready",
+            "KORU 0d2bd9325 design-ruling; 6905a567c 'Ruling: Lars, 2026-07-27'"
+          ]
+        },
+        "verification": {
+          "extra": [
+            "method/oracle",
+            "result: pass|fail|deviation",
+            "controls[]",
+            "baseline"
+          ],
+          "src": [
+            "BEL p.22: 'Nicht was gilt, sondern was festgestellt wurde.' 'Ein Nachweis ist immer eine Behauptung mit Urheber und Zeitpunkt.' Multiple, even conflicting, Nachweise coexist",
+            "KORU c7da83a40 'verified failing identically on a pristine 7056064cf baseline'; 24c1538c0 Verified: (oracle gzip -dc)"
+          ]
+        },
+        "inclusion": {
+          "extra": [
+            "into (branch/baseline/release)",
+            "from (commit range)",
+            "pins[]"
+          ],
+          "src": [
+            "BEL §5.3 baseline as set of pinned pointers; ELSTER §11.3 release references spec version",
+            "KORU 082171caf merge: names pins + concept; merges never squashed"
+          ]
+        },
+        "supersession": {
+          "extra": [
+            "supersedes (required)",
+            "kind: evolve|merge|split"
+          ],
+          "src": [
+            "KORU membrane evolve/Occludes (606), merge/Parents (6438e18c1, 2000b1879)",
+            "BEL p.20: 'Eine gelöschte Verbindung ist dann kein spurloser Vorgang, sondern eine dokumentierte Änderung am Nachweisstand.'"
+          ]
+        },
+        "overrule": {
+          "extra": [
+            "supersedes (required)",
+            "reason (required)",
+            "overruled_by",
+            "signals>=1"
+          ],
+          "src": [
+            "KORU correct/Severs (20), f284251ba Lars quote + Severs + Provenance",
+            "BEL p.22: Beanstandung, Widerruf, erneute Freigabe as normal states of a Nachweiskette"
+          ]
+        },
+        "move": {
+          "extra": [
+            "custody_from",
+            "custody_to",
+            "content hash unchanged"
+          ],
+          "src": [
+            "KORU a332a22f9 Action: move, Custody: koru-libs -> koru",
+            "MORe single_home: changing the leading place is a recorded change of home, not a copy"
+          ]
+        }
+      },
+      "rules": [
+        "no update, no delete: ending anything is an event",
+        "supersession/overrule must link superseded item@version",
+        "overrule may not declare acknowledged-none",
+        "move with changed content is refused (split into move + supersession)",
+        "verification without pinned_against is 'unmeasured' and satisfies no gate",
+        "a belief/decision-class signal requires an event on the subject in the same transaction"
+      ],
+      "projections": {
+        "issue_view": "fold over events with subject=issue: open decisions, latest verification per check, inclusions, supersession chain",
+        "pr_view": "projection of one inclusion event (into, from-range) + verifications pinned to its head; description generated, not authored",
+        "status": "derived: Ready = no open decision on subject + DoR; Done = inclusion + passing verification pinned to included version; hand-set status = drift"
+      },
+      "drift_checks_added": [
+        "status_hand_set",
+        "verification_unpinned",
+        "supersession_unlinked",
+        "event_mutated"
+      ],
+      "migration_src": "ELSTER §10 'Die Umstellung muss nicht mit einem Big Bang beginnen … manuellen Kopien Schritt für Schritt durch Ableitungen ersetzen' — the same phased cutover applies: existing board status/fields become projections of backfilled events"
+    }
+  },
+  "layers": {
+    "relations": {
+      "note": "Every relation is a typed pointer (version-pinned). Relations never copy target content.",
+      "types": {
+        "refines": {
+          "reverse": "is_refined_by",
+          "de": "verfeinert",
+          "preserves": null,
+          "src": "PI Leitprinzip 3"
+        },
+        "references": {
+          "reverse": "is_referenced_by",
+          "de": "referenziert",
+          "preserves": null,
+          "src": "PI; BEL §9 (reference != release)"
+        },
+        "derives_from": {
+          "reverse": "derived_into",
+          "de": "wird abgeleitet aus",
+          "preserves": "required (it is a projection edge)",
+          "src": "BEL §5.2.1, ELSTER §6"
+        },
+        "implements": {
+          "reverse": "implemented_by",
+          "de": "setzt um",
+          "preserves": "required (checked via tests, not regeneration; code is not a projection)",
+          "src": "BEL §7.2, ELSTER §6"
+        },
+        "verifies": {
+          "reverse": "verified_by",
+          "de": "weist nach",
+          "preserves": "required",
+          "src": "BEL §7.2"
+        },
+        "decided_in": {
+          "reverse": "affects",
+          "de": "wird entschieden in",
+          "preserves": null,
+          "src": "BEL §7.2-7.3"
+        },
+        "causes_risk": {
+          "reverse": "results_from",
+          "de": "erzeugt Risiko",
+          "preserves": null,
+          "src": "BEL §7.2"
+        },
+        "depends_on": {
+          "reverse": "is_prerequisite_of",
+          "de": "haengt ab von",
+          "preserves": null,
+          "src": "BEL §7.1 (DoR)"
+        },
+        "member_of": {
+          "reverse": "contains",
+          "de": "gehoert zu Baseline",
+          "preserves": null,
+          "src": "BEL §5.3"
+        }
+      },
+      "evidence": {
+        "rule": "Evidence is an artifact (authored once) asserting that pointer P between A@x and B@y holds; author, time, method, result. Several may coexist.",
+        "src": "BEL §9 three levels"
+      },
+      "claim_types": {
+        "source": "MP p.5-6 (B.0/2): 'Jede Beziehung hat einen anderen Nachweisanspruch'",
+        "mp_list": {
+          "wird repräsentiert durch": "represented_by (e.g. XSD)",
+          "wird verfeinert durch": "is_refined_by",
+          "wird umgesetzt durch": "implemented_by",
+          "wird verifiziert durch": "verified_by (Testfall)",
+          "wird validiert durch": "validated_by (Validator)",
+          "wird abgenommen durch": "accepted_by (AC)"
+        },
+        "gaps_vs_kernel": "represented_by, validated_by and accepted_by have no kernel type yet; proposed as additions, each declaring its evidence claim. MP B.3.2 plans 'Beziehungstypen als feste Liste' in the glossary; that list is not in MP.",
+        "rule": "relations are attributes of the existing relation layer, not a new layer (MP p.6 B.1; p.10 'Keine vierte Framework-Schicht')"
+      }
+    },
+    "artifact_types": {
+      "domain": "IA §8",
+      "need": "PI p.7",
+      "requirement": "PI p.7",
+      "use_case": "UC, IA §9",
+      "process": "BP, IA §9",
+      "domain_model": "CM, IA §9",
+      "ui": "UI, IA §9",
+      "interface": "API, IA §9",
+      "spec_element": "SPEC, ELSTER §6.1",
+      "rule": "RULE, ELSTER §6.1",
+      "test_case": "TC, IA §9",
+      "acceptance": "AC, IA §9",
+      "decision": "DEC, states open|decided, IA §9 / BEL §7.3",
+      "risk": "RISK, BEL §7.2",
+      "evidence": "BEL §9",
+      "baseline": "BL, a set of pinned pointers (artifacts AND relations), BEL §5.3",
+      "production_evidence": "PROD, ELSTER §11.3",
+      "implementation": "external artifact (code, story); held in its own home, pointed to, never copied; NOT a projection (ELSTER §6)"
+    },
+    "projection_kinds": {
+      "document": "IA §6 'Dokumente sind Sichten'",
+      "generated_representation": "XSD/API schema, field catalogue, validator, generated tests (ELSTER §6)",
+      "board_view": "list/kanban/timeline/story map (MAN artifacts; BEL §7 'vier Sichten auf denselben Bestand')",
+      "aggregate": "counts, status rollups, unread badges - must be computed or declared caches with drift check",
+      "mirror": "read-only display of an external artifact's content, always with source@version + regenerated, never edited"
+    },
+    "gates": {
+      "invariant_gate": "every gate first runs drift_check on the artifacts it touches; any violation blocks",
+      "definition_of_ready": {
+        "checks": [
+          "no linked decision open (decided_in)",
+          "AC + essential rules clear",
+          "depends_on / risks resolved enough",
+          "work item POINTS to the leading spec instead of restating it (MAN DoR)"
+        ],
+        "src": "BEL §7.1, §7.3.2; MAN"
+      },
+      "definition_of_done": {
+        "checks": [
+          "unique rule/field id",
+          "decision traceable",
+          "all generated representations from the same spec version",
+          "implementation passes AC+tests of that version",
+          "positive and negative tests",
+          "integration impact visible",
+          "production evidence points to released spec version"
+        ],
+        "src": "ELSTER §11.3"
+      },
+      "structural_rules": {
+        "checks": [
+          "rule_without_test",
+          "missing_evidence",
+          "decision_contradicts_summary",
+          "dangling/unpinned pointer",
+          "baseline points to stale spec"
+        ],
+        "src": "BEL §5.4, §10.4"
+      }
+    },
+    "lifecycle": {
+      "chain": [
+        "need",
+        "requirement",
+        "solution_element",
+        "implementation",
+        "verification",
+        "acceptance",
+        "production_evidence"
+      ],
+      "cross_cutting": [
+        "decision",
+        "evidence"
+      ],
+      "note": "Each stage is a separate artifact connected by pointers; stages never restate the previous stage (IA §9 'ergaenzt den vorherigen Informationsstand, ohne ihn zu wiederholen').",
+      "change_process": [
+        "change_need",
+        "decision",
+        "change_source_artifact",
+        "regenerate_projections",
+        "implement",
+        "test",
+        "diff_review",
+        "release",
+        "production_evidence"
+      ],
+      "src": "PI p.7; REG; ELSTER §11.2",
+      "demo_chain": {
+        "src": "DEMO",
+        "stages": [
+          [
+            "need",
+            "Bedarf",
+            "Geklaert",
+            "Product Owner"
+          ],
+          [
+            "usecase",
+            "UC-042",
+            "Freigegeben",
+            "Requirements Engineer"
+          ],
+          [
+            "rules",
+            "R-17..R-19",
+            "Konsistent",
+            "Fachbereich"
+          ],
+          [
+            "delivery",
+            "FEAT-118/STORY-241/242",
+            "Ready",
+            "Entwicklung"
+          ],
+          [
+            "test",
+            "TC-421..423",
+            "7/7 bestanden",
+            "Testmanager"
+          ],
+          [
+            "release",
+            "Abnahme 14.08.2026 / Release 2026.09 / v4.12.0",
+            "Nachgewiesen",
+            "Release Manager"
+          ]
+        ],
+        "rule": "'Die Story verweist auf UC-042 und enthaelt nur den konkreten Arbeitsauftrag'"
+      },
+      "export_pipeline_elster": {
+        "src": "ELSTER §8.3",
+        "steps": [
+          "read source",
+          "classify absent/null/0",
+          "check business rules",
+          "apply type and format",
+          "sort by serializationOrder",
+          "generate XML",
+          "validate XSD",
+          "validate plausibility",
+          "log submission/response"
+        ]
+      }
+    },
+    "profiles": {
+      "light": {
+        "types": [
+          "use_case",
+          "acceptance",
+          "decision"
+        ],
+        "invariant": "single_home + projections never hand-edited"
+      },
+      "standard": {
+        "types": [
+          "+process",
+          "+domain_model",
+          "+interface",
+          "+test_case"
+        ],
+        "invariant": "+ drift_check in CI"
+      },
+      "controlled": {
+        "types": [
+          "+baseline",
+          "+evidence"
+        ],
+        "invariant": "+ all non-nav pointers version-pinned"
+      },
+      "ai_regulated": {
+        "types": [
+          "+data_source",
+          "+model",
+          "+evaluation",
+          "+monitoring",
+          "+production_evidence"
+        ],
+        "invariant": "+ AI configuration baseline (BEL §6.2)"
+      },
+      "cutover": {
+        "kind": "domain profile; orthogonal to the strictness ladder light → standard → controlled → ai_regulated and combinable with any rung",
+        "types": [
+          "+cutover_step",
+          "+reflow"
+        ],
+        "invariant": "+ baseline immutable after publish; forecast changes only through an approved reflow decision; actuals append-only, corrected only by supersession",
+        "event_mapping": {
+          "baselinePublished": "inclusion",
+          "reflowProposed": "decision",
+          "reflowApproved": "decision",
+          "corrected": "supersession",
+          "actualStarted": "verification",
+          "actualFinished": "verification",
+          "blocked": "verification",
+          "unblocked": "verification",
+          "failed": "verification",
+          "skipped": "verification",
+          "rollbackStarted": "verification",
+          "rollbackCompleted": "verification",
+          "gateViolation": "verification"
+        },
+        "event_mapping_note": "reflowProposed is an open decision and reflowApproved the decided one (decided_by = approver); an authorized reflowApproved also emits a supersession of the proposal events, so the open decision closes; a correction supersedes the corrected event; observations are production-stage verifications without gate or witness, so they never count as gate-accepted evidence for done; the baselinePublished inclusion names cutover and every task:<id> of the baseline, so observations about a task follow an inclusion of that subject (production_evidence rule)",
+        "status": "task statuses (planned, ready, active, completed, blocked, failed, skipped, rollback) are folds over the live log: superseded events and decisions by unauthorized deciders do not count; no event sets a status",
+        "implementation": "kernel/Cutover (Lean 4): Cutover/Profile.lean maps every cut-over event to a MORe event; more-check compares this mapping with the Lean classification",
+        "src": "KIRA cut-over calculus (feat/kira-lean-cutover-kernel, docs/GROBKONZEPT.md, docs/PLAN.md); reflow has no MORe source, so it lives in this profile, not in the core"
+      },
+      "src": "BEL §10.3",
+      "rule": "profiles add types and strictness; the invariant itself is never optional",
+      "zoho_lesson": {
+        "src": "BEL §4",
+        "text": "ZOHO is the counter-example: rebuilding a classic document template (legend, abbreviations, empty chapters) is not MORe. For that UC: wish, analysis result, decision, optional AC, evidence of standard function."
+      }
+    },
+    "configuration_states": {
+      "src": "ZOHO p.6 status legend (KM-Plan); BEL §9 Requirement Yogi",
+      "states": [
+        "in_bearbeitung",
+        "vorgelegt",
+        "akzeptiert",
+        "freigegeben",
+        "obsolet"
+      ],
+      "transitions": {
+        "in_bearbeitung->vorgelegt": "author done, put under KM control, QS review",
+        "vorgelegt->in_bearbeitung": "QS rejects",
+        "vorgelegt->akzeptiert": "QS not rejected",
+        "akzeptiert->freigegeben": "QS released",
+        "freigegeben->(new version)": "'darf nur noch innerhalb einer neuen Version geaendert werden'",
+        "*->obsolet": "superseded/not needed"
+      },
+      "rule": "released artifacts are immutable; change = new version. Release state is reachable only when required fields are present (BEL §9)",
+      "note": "this is the artifact/document configuration lifecycle; distinct from work-item status (Jira) and from the requirement chain"
+    },
+    "decision_record": {
+      "src": "ZOHO §8.8 DEC-001; BEL §7.3; IA §9",
+      "fields": [
+        "id (UC-xxx-DEC-nnn)",
+        "decision",
+        "alternatives",
+        "rationale",
+        "decided_at",
+        "decided_by",
+        "status (open|decided)",
+        "affects (pointers)"
+      ],
+      "home": "attached to the use case, or a 'Entscheidung' ticket type (ZOHO §8.8 'Alternativ: Ticket-Typ-Entscheidung')",
+      "zoho_example": {
+        "id": "UC-001-DEC-001",
+        "decision": "Umsetzung erfolgt nicht. Die Funktion ist im CRM bereits vorhanden (Kontakt -> offene Aktivitaet -> Meeting)",
+        "by": "Reiner Schindler",
+        "status": "erledigt"
+      },
+      "note": "a decision can close a use case with no implementation; the decision plus evidence of the standard function is the whole trace (BEL §4.3)"
+    },
+    "evidence_record_practice": {
+      "src": "ZOHO version table (pageVersion links); BEL §5.2 ('Abnahme bezieht sich ausdruecklich auf einen identifizierten Versionsstand'); DEMO release stage",
+      "pattern": "evidence points to artifact@version (Confluence pageVersion=N, release 2026.09, productive version 4.12.0, acceptance date)",
+      "acceptance_is_state_not_date": "BEL §6.2: Abnahme shifts from a single date to a verifiable baseline state"
+    },
+    "views_by_role": {
+      "src": "DEMO roles; BEL §7",
+      "roles": {
+        "Product Owner": [
+          "need",
+          "usecase",
+          "rules",
+          "delivery"
+        ],
+        "Entwicklung": [
+          "usecase",
+          "rules",
+          "delivery"
+        ],
+        "Test": [
+          "rules",
+          "test",
+          "release"
+        ],
+        "Release": [
+          "delivery",
+          "test",
+          "release"
+        ]
+      },
+      "rule": "same stock, role-filtered projections; no separate backlogs"
+    },
+    "governance_roles": {
+      "src": "ELSTER §11.1",
+      "roles": [
+        "Fachlicher Owner (meaning, decision)",
+        "Specification Steward (model consistency)",
+        "Entwicklung (implementation vs spec)",
+        "Test/QA (executable evidence, rule coverage)",
+        "Betrieb/Integration (runtime feedback, acceptance/error evidence)"
+      ]
+    },
+    "not_in_sources": {
+      "items": [
+        "reflow",
+        "cut-over mechanics",
+        "forecast/actual schedule layers"
+      ],
+      "finding": "No source page, PDF or demo bundle describes reflow or cut-over as a MORe mechanism. Cut-over appears only as an example domain (BEL §7.3 UC-COP-011 'Cut-over-Bestand im Board anzeigen', DEC-COP-001). Schedule baseline/forecast/actual and reflow are board/cut-over-tool concepts; MORe 'Baseline' = configuration baseline (BEL §5.3, §6.2). Keep them under projections.lolaplex-board."
+    }
+  },
+  "projections": {
+    "lolaplex-board": {
+      "store": "SQLite",
+      "profile": "light -> standard",
+      "board_only_config": {
+        "note": "kept from v1 so PR #28 semantics survive; these are board concerns, not MORe",
+        "relation_types": {
+          "follow": {
+            "semantics": "soft ordering; a view hint, not a MORe relation",
+            "gate": false
+          }
+        },
+        "workflow_statuses": [
+          "backlog",
+          "todo",
+          "in_progress",
+          "done",
+          "canceled"
+        ],
+        "gates": {
+          "depends": {
+            "blocks": [
+              "in_progress",
+              "done"
+            ]
+          }
+        },
+        "schedule_layers": [
+          {
+            "id": "baseline",
+            "mutable": false
+          },
+          {
+            "id": "forecast",
+            "mutable": true
+          },
+          {
+            "id": "actual",
+            "mutable": "append-only"
+          }
+        ],
+        "kind_map": {
+          "task": "implementation (pointer to external work)",
+          "requirement": "requirement",
+          "decision": "decision",
+          "test": "test_case",
+          "cutover_step": "board subtype of implementation"
+        },
+        "relation_map": {
+          "depends": "depends_on",
+          "refines": "refines",
+          "references": "references",
+          "evidences": "verifies",
+          "follow": "board-only"
+        },
+        "verbs": "unchanged from v1 (caps)",
+        "views": [
+          "list",
+          "board",
+          "timeline"
+        ],
+        "schedule_layers_note": "board-specific; not MORe. Do not name the schedule layer 'baseline' in MORe-facing APIs (clashes with configuration baseline)."
+      },
+      "duplication_audit": "see more-lean-model.md §5"
+    }
+  },
+  "notes_v4": {
+    "reflow_cutover": "Checked against JWF (the bibliography's Jira workflow, supplied 2026-10-17): it contains no reflow and no cutover. Reflow has no MORe source; cut-over appears only in BEL §7.3 as the domain of DEC-COP-001 (a decision event). Board schedule reflow remains a board concern. If the plugin Fabian's father built had reflow/cutover, it is not in this neutralised deck; a different artifact (plugin workflow XML) would be needed. Update 2026-10-18: reflow and cut-over now have a MORe home as the domain profile layers.profiles.cutover (from the KIRA cut-over kernel); the core still has no reflow."
+  },
+  "derived_status": {
+    "rule": "Status is never set. No event type or verb writes a status; every status is a fold over events.",
+    "ready": "no open decision event on the subject + DoR",
+    "verified": "among the gate-accepted test verifications pinned to subject@v, the latest one per check (gate and method) decides: at least one passes and none fails. A later result replaces an earlier one of the same check only, so a pass on one check of a gate never hides a fail on another check of that gate. Sources: core_primitives projections.issue_view 'latest verification per check'; JWF p.10 QG 2 'Tests erfolgreich'; BEL p.22 'Über dieselbe fachliche Relation können mehrere, auch widersprüchliche Nachweise nebeneinander bestehen'. Fabian, 2026-10-19: per check, not per gate (Lean latestPerCheck)",
+    "done": "inclusion event (release/baseline) of subject@v AND a gate-accepted, passing verification pinned_against subject@v; a verification pinned to another version does not count",
+    "chain": [
+      {
+        "step": "test_verification",
+        "event": "verification",
+        "pinned_against": "subject@v"
+      },
+      {
+        "step": "business_acceptance",
+        "event": "decision",
+        "note": "WPUS: acceptance 'is more than a status change. It is the decision'; links requirement, tests and the version accepted"
+      },
+      {
+        "step": "release_inclusion",
+        "event": "inclusion",
+        "pinned_against": "subject@v"
+      },
+      {
+        "step": "production_evidence",
+        "event": "verification",
+        "pinned_against": "release baseline",
+        "after": "release_inclusion"
+      }
+    ],
+    "derived_states": [
+      "verified",
+      "accepted",
+      "released (=done)",
+      "proven_in_production"
+    ],
+    "gates": "No gate on moving to done, because there is no move to done; gates digest witnesses into verification events.",
+    "violations": [
+      "status_hand_set",
+      "acceptance_as_status",
+      "verification_unpinned",
+      "production_evidence_before_release"
+    ]
+  },
+  "hierarchy": {
+    "source": "LEI (Practitioner Training): 'die Hierarchie von Fachgebiet über Anwendungsfall bis zu BP, CM, UI, API, TC, AC und DEC — Jede Ebene beantwortet genau eine Frage. Nicht mehr, nicht weniger.'",
+    "levels": [
+      "Fachgebiet",
+      "Anwendungsfall",
+      "BP",
+      "CM",
+      "UI",
+      "API",
+      "TC",
+      "AC",
+      "DEC"
+    ],
+    "parent": {
+      "Anwendungsfall": "Fachgebiet",
+      "BP|CM|UI|API|TC|AC|DEC": "Anwendungsfall"
+    },
+    "rule": "one_question_per_level: each level declares exactly one question (level.question) in the profile; each node must answer its level's question and no other level's",
+    "question_texts": "Declared in hierarchy.questions. English is canonical; German is the source wording. 8 of 9 are verbatim from IA v1.4 §9; Fachgebiet is proposed. AC stays 'business fulfilment' only: IA §15.2 also hangs production evidence on AC, but the kernel keeps production evidence as its own step after release inclusion.",
+    "lint": {
+      "id": "one_question",
+      "flags": [
+        {
+          "violation": "node_answers_none",
+          "check": "node has no content addressing its level question (empty/placeholder answer field)"
+        },
+        {
+          "violation": "node_answers_multiple",
+          "check": "node carries content belonging to another level's question (e.g. a UC restating AC or a DEC rationale) instead of a pointer to that node"
+        }
+      ],
+      "relation_to_invariant": "answering two questions is a duplicate home for one of them; the fix is split + pointer"
+    },
+    "questions": {
+      "Fachgebiet": {
+        "en": "Which use cases belong together in this domain, and how do they relate?",
+        "de": null,
+        "src": "proposed from IA v1.4 §8 p.11 (domain summary page: overview of the domain, its use cases and their connection); IA §9 table has no Fachgebiet row"
+      },
+      "Anwendungsfall": {
+        "en": "What does the user want to achieve?",
+        "de": "Was will der Nutzer erreichen?",
+        "src": "IA v1.4 §9 p.12 (table 'Die eine Frage')"
+      },
+      "BP": {
+        "en": "How does it work from a business perspective?",
+        "de": "Wie läuft es fachlich ab?",
+        "src": "IA v1.4 §9 p.12 (table 'Die eine Frage')"
+      },
+      "CM": {
+        "en": "Which terms and data are we working with?",
+        "de": "Mit welchen Begriffen und Daten wird gearbeitet?",
+        "src": "IA v1.4 §9 p.12 (table 'Die eine Frage')"
+      },
+      "UI": {
+        "en": "How does the user interact with the system?",
+        "de": "Wie interagiert der Nutzer mit dem System?",
+        "src": "IA v1.4 §9 p.12 (table 'Die eine Frage')"
+      },
+      "API": {
+        "en": "How do the systems communicate?",
+        "de": "Wie kommunizieren die Systeme?",
+        "src": "IA v1.4 §9 p.12 (table 'Die eine Frage')"
+      },
+      "TC": {
+        "en": "How is the implementation verified?",
+        "de": "Wie wird die Umsetzung geprüft?",
+        "src": "IA v1.4 §9 p.12 (table 'Die eine Frage')"
+      },
+      "AC": {
+        "en": "When is the requirement fulfilled from a business perspective?",
+        "de": "Wann ist die Anforderung fachlich erfüllt?",
+        "src": "IA v1.4 §9 p.12 (table 'Die eine Frage')"
+      },
+      "DEC": {
+        "en": "Why is it solved this way?",
+        "de": "Warum ist es so gelöst?",
+        "src": "IA v1.4 §9 p.12 (table 'Die eine Frage')"
+      }
+    }
+  },
+  "generated_projections": {
+    "compliance_matrix": {
+      "source": "LEI (Compliance Intensiv / Aufbaumodul): map MORe structure to evidence duties of DORA, NIS2, KRITIS-Dachgesetz, MaRisk, ISO 27001 — 'Welche MORe-Ebene liefert welchen Nachweis', DEC 'revisionssicher', result 'eine Mapping-Matrix'",
+      "kind": "projection (never hand-kept)",
+      "inputs": [
+        "regulation_requirement artifacts (one per duty, ID + version of the regulation text)",
+        "maps_to pointers: requirement -> (hierarchy level, event type)",
+        "event log"
+      ],
+      "function": "for each duty: level + event type that evidences it, plus the live events satisfying it per subject@version; gaps = duties with no satisfying event",
+      "row": [
+        "regulation",
+        "duty_id@version",
+        "level",
+        "event_type",
+        "satisfying_events",
+        "gap"
+      ],
+      "violations": [
+        "matrix_hand_edited",
+        "duty_unmapped"
+      ],
+      "regulations": [
+        "DORA",
+        "NIS2",
+        "KRITIS-Dachgesetz",
+        "MaRisk",
+        "ISO 27001"
+      ],
+      "mappings": "not specified on the site; declared per organisation, not invented here"
+    }
+  },
+  "governance_concepts": {
+    "status_model": "a declared state machine per artifact kind; every state is a derived fold over events (see derived_status), transitions are event types, never writes",
+    "approval_path": "a declared sequence of required decision events (approver role, subject@version) that a derived state needs",
+    "source": "LEI: Assessment analyses 'Statusmodelle, Freigabewege'; Pilot builds 'Statusmodelle, Entscheidungen, Tests und Nachweise' in Jira/Confluence. Neither is specified on the site."
+  },
+  "jira_status_model": {
+    "source": "JWF pp.7-8 (states), p.10 (quality gates), p.5 (principles)",
+    "principles": {
+      "one_inventory": "boards are views, no second truths (JWF p.4-5, p.9)",
+      "status_is_maturity": "states describe maturity and responsibility (p.5, p.8)",
+      "every_transition_leaves_history": "acceptance and production refer to a concrete version/Stand (p.5)"
+    },
+    "phases": [
+      {
+        "phase": "Klärung / DoR",
+        "states": [
+          "Neu",
+          "Ausgewählt",
+          "In fachlicher Beschreibung",
+          "In technischer Beschreibung",
+          "Fertig für Einplanung"
+        ]
+      },
+      {
+        "phase": "Umsetzung / DoD",
+        "states": [
+          "Fertig für Entwicklung",
+          "In Entwicklung",
+          "In technischer QS",
+          "Fertig zum Testen"
+        ]
+      },
+      {
+        "phase": "Test & Abnahme",
+        "states": [
+          "Im fachlichen Test",
+          "Test abgeschlossen",
+          "In Abnahme",
+          "Abgenommen"
+        ]
+      },
+      {
+        "phase": "Produktion",
+        "states": [
+          "Produktion",
+          "Geschlossen"
+        ]
+      }
+    ],
+    "transitions": "forward order within and across phases as listed (JWF p.8). Optional states may be dropped per project; the chain must stay intact (p.8). The deck shows no backward transitions, no rework loop and no per-transition conditions beyond the three QGs.",
+    "gates": {
+      "QG1": {
+        "name": "Ready für Umsetzung",
+        "guards": [
+          "Ziel verstanden",
+          "Akzeptanzkriterien ausreichend",
+          "wesentliche Risiken bekannt"
+        ],
+        "question": "Kann sinnvoll umgesetzt werden?",
+        "reaches": "Fertig für Einplanung",
+        "reaches_src": "JWF p.7: column 'DoR / QG 1' ends with 'Fertig für Einplanung'; Fertig für Einplanung = Ready",
+        "src": "JWF p.10, p.7"
+      },
+      "QG2": {
+        "name": "Ready für Abnahme",
+        "guards": [
+          "Umsetzung fertig",
+          "Tests erfolgreich",
+          "Entscheidungen nachvollziehbar"
+        ],
+        "reaches": "In Abnahme",
+        "reaches_src": "JWF p.10: 'QG 2 Ready für Abnahme'; 'Die Bedingungen liegen dort, wo der Status wechselt.' QG2 is the transition into In Abnahme, not the acceptance itself",
+        "src": "JWF p.10",
+        "guard_mapping": {
+          "Umsetzung fertig": "an implements claim from subject@version is met (JWF p.7 DoD: 'Fertig entwickelte Arbeit'; state Fertig zum Testen)",
+          "Tests erfolgreich": "derived_status.verified: the latest test verification per check (gate and method) passes, pinned to subject@version, and no latest one fails",
+          "Entscheidungen nachvollziehbar": "no open decision on the subject; a decided decision names its decider and carries its time (BEL p.18: 'Variante, Entscheider und Datum sind dokumentiert')",
+          "not_a_guard": "a separate 'UAT release' decision: p.10 lists none for QG2; the 'Freigabe' of p.7 is the acceptance decision (jira_status_model.acceptance)",
+          "consequence": "every QG2 guard is already implied by QG1 (no open decision), Fertig zum Testen and Test abgeschlossen, so the derived walk never stops at Test abgeschlossen (Lean not_test_abgeschlossen). JWF p.8 allows this: 'Optionale Status können projektspezifisch entfallen.'"
+        }
+      },
+      "QG3": {
+        "name": "Produktiver Stand",
+        "guards": [
+          "freigegeben",
+          "Release zugeordnet",
+          "Produktions-/Change-Status dokumentiert"
+        ],
+        "reaches": "Geschlossen",
+        "reaches_src": "JWF p.7: 'Produktion / QG 3 ... Produktiver und geschlossener Stand'",
+        "guard_mapping": {
+          "freigegeben": "the acceptance decision (jira_status_model.acceptance); the Freigabe of JWF p.7 'Fachliche Prüfung und Freigabe', modelled once",
+          "Release zugeordnet": "an inclusion event of subject@version into a release baseline (core_primitives.event.types.inclusion)",
+          "Produktions-/Change-Status dokumentiert": "a passing, gate-accepted production verification pinned to the release baseline, after the inclusion (derived_status.proven_in_production)",
+          "not_a_guard": "a separate release approval decision by Release/Team: p.10 lists no decision for QG3, and the p.9 Release / Team board shows 'Freigegebene Stände', i.e. states that are already released"
+        },
+        "src": "JWF p.10"
+      },
+      "DoD_Abnahme_question": "Ist vollständig, geprüft und nachweisfähig? (p.7)",
+      "rule": "conditions are checked at the transition where status changes, not moved before the work (p.10)"
+    },
+    "acceptance": {
+      "topic": "acceptance_decision",
+      "decision": "a decided decision event with topic acceptance_decision and an acceptance (outcome, linked passing test verifications), pinned to subject@version, by a principal holding one of the profile's acceptor roles. It is the latest acceptance on subject@version (derived_status.accepted)",
+      "default_acceptor_roles": [
+        "PO/Fachbereich",
+        "Test/Abnahme"
+      ],
+      "roles_rule": "the profile sets acceptor_roles; a profile may narrow the default",
+      "reaches": "Abgenommen",
+      "is_also": "the QG3 guard 'freigegeben': one Freigabe, not modelled twice",
+      "src": [
+        "JWF p.7: 'UAT & Abnahme / QG 2 ... Fachliche Prüfung und Freigabe'",
+        "JWF p.9: PO / Fachbereich board 'fachliche Abnahme'; Test / Abnahme board 'Abnahmeentscheidung'",
+        "IA v1.4 p.13, AC: 'fachlich erfüllt?' ... 'Abnahmeentscheidung, Nachweis'",
+        "BEL §5.2: 'Die Abnahme bezieht sich ausdrücklich auf einen identifizierten Versionsstand.'"
+      ]
+    },
+    "approval_path": "JWF names one approval: the Freigabe / Abnahmeentscheidung (p.7 'Fachliche Prüfung und Freigabe'; p.9 'fachliche Abnahme', 'Abnahmeentscheidung'). It is the acceptance decision (jira_status_model.acceptance), which reaches Abgenommen and is the QG3 guard 'freigegeben'. No gate has a further approval step: p.10 lists no decision among the QG guards. Board roles: PO/Fachbereich, Entwicklung, Test/Abnahme, Release/Team (p.9).",
+    "mapping_to_v4": {
+      "note": "Jira states are kept as a derived status model (governance_concepts.status_model): each state is a fold over v4 events, never written. Mapping is ours; the deck does not use event vocabulary.",
+      "Neu..In technischer Beschreibung": "derived from decision events (selection, open DECs) and authored artifacts",
+      "Fertig für Einplanung (=Ready)": "derived: no open decision + QG1 guards held as verification events pinned to subject@v",
+      "Fertig für Entwicklung..Fertig zum Testen": "derived from implementation pointers + verification events (technische QS)",
+      "Im fachlichen Test / Test abgeschlossen": "verification events pinned to subject@v",
+      "In Abnahme / Abgenommen": "In Abnahme = QG2 held (implements claim met + verified + no open decision). Abgenommen = the acceptance decision (jira_status_model.acceptance), a decision event, never a status",
+      "Produktion": "derived_status.done: inclusion into a release (Release zugeordnet) + verified + accepted. Kernel derivation: JWF gives the state no condition; the p.9 Release / Team board lists 'Freigegebene Stände, Release-Zuordnung, Produktionsstatus, offene Nachweise'",
+      "Geschlossen": "QG3 held (JWF p.7: 'Produktion / QG 3 ... Produktiver und geschlossener Stand'): acceptance decision + inclusion + production verification pinned to the release baseline (derived_status.proven_in_production); derived terminal fold, no event writes it. Geschlossen implies derived_status.done; done alone is not Geschlossen",
+      "Done": "the deck has no 'Done' state, only DoD as a phase (p.7). Any Jira 'Done' maps to derived_status.done; setting 'Done' or 'Geschlossen' by hand is status_hand_set"
+    },
+    "reflow_cutover": "NOT in JWF. Neither word nor any rescheduling, rollback or cut-over step appears in the 13 pages. The v3 finding stands: reflow has no MORe source; cut-over appears only as BEL §7.3 example domain (UC-COP-011/DEC-COP-001).",
+    "kernel_additions": {
+      "note": "rules of the JWF mapping with no source text; kept on purpose (more-lean-model.md §12a)",
+      "decision.topic": {
+        "rule": "a decision event names the question it answers (e.g. 'acceptance_decision'); the kernel reads only acceptance_decision",
+        "reason": "without it, any decided decision with an acceptance (e.g. an unrelated PO decision) would count as the acceptance decision",
+        "not_in": [
+          "IA v1.4 p.13 DEC: 'Festlegung, Alternativen, Begründung, Datum, Entscheider'",
+          "decision_record.fields"
+        ],
+        "tension": "BEL §7.3.1 p.17: 'Neben den Jira-Standardfeldern genügen zwei zusätzliche Felder. Ein separates Feld „Bezug“ ist unnötig: Die betroffenen Informationsobjekte werden über die semantischen Links bestimmt.' topic is not Bezug: it names the kind of decision, not the affected objects (subjects, pinned_against, pointers)"
+      },
+      "verification.stage.review": {
+        "rule": "each QG1 guard is a verification of stage review, pinned to subject@version, whose method names the guard; a review never counts as a test verification",
+        "reason": "the QG1 guards are understanding checks, not tests (JWF p.10: 'Ziel verstanden', 'Akzeptanzkriterien ausreichend', 'wesentliche Risiken bekannt'); an unpinned review is drift like any verification ('verification without pinned_against is unmeasured and satisfies no gate', core_primitives rules)",
+        "not_in": "the stage name review has no source"
+      }
+    }
+  },
+  "derivation_invariants": {
+    "source": "MP p.6-7 (B.2)",
+    "principle": "Eine Ableitung ist nur dann belastbar, wenn die für ihren Zweck relevanten fachlichen Invarianten erhalten bleiben und dies überprüfbar ist.",
+    "elster_field_rule_invariants": [
+      "Wertebereich",
+      "Pflicht / Optionalität",
+      "Kardinalität",
+      "Abhängigkeitsbedingung"
+    ],
+    "check": "machine-checkable against XSD, validator and test coverage; result is a Ableitungsnachweis artifact (MP p.7) = a verification event pinned to source@v and derivation@v",
+    "maps_to": "projection.preserves[] / drift_check"
+  },
+  "purpose_indexed_equivalence": {
+    "source": "MP p.8 (C.1)",
+    "statement": "A quotient map is one equivalence relation; MORe needs a family of purpose-indexed relations: what is indistinguishable for verification is not for acceptance, and differs again for operations/monitoring.",
+    "consequence": "preserves[] is indexed by purpose (verification|acceptance|operations); one projection can be valid for one purpose and not another. Relevant to agents-memory quotient-tower SPEC.",
+    "boundary": "MP p.7 C.0 / p.10: formal semantics is not part of the MORe core; MORe defines which information, relations, derivations and evidence are kept and each relation's evidence claim."
+  }
+}
