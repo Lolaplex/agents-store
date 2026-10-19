@@ -13,6 +13,7 @@ from .hierarchy import Finding, Node, lint, lint_profile
 from .relations import Pointer, claim_met, relation_check
 from .ready import dor_violations, ready
 from .jwf import acceptance_decided, gate_held, jwf_state
+from .decisions import LiveDecision, latest_live_decision
 
 __all__ = [
     "Profile", "load_profile", "EVENT_TYPES", "Event", "parse_ref",
@@ -21,4 +22,5 @@ __all__ = [
     "Finding", "Node", "lint", "lint_profile",
     "Pointer", "claim_met", "relation_check", "dor_violations", "ready",
     "acceptance_decided", "gate_held", "jwf_state",
+    "LiveDecision", "latest_live_decision",
 ]

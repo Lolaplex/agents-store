@@ -8,6 +8,8 @@ owns:
   - src/agents_store/more/schema.sql
   - src/agents_store/db.py
   - tests/more/test_store_integration.py
+  - tests/more/test_decisions_store.py
+  - src/agents_store/more/decisions.py
   - docs/more/README.md
   - docs/frags/0015-more-store.md
 accepts: []
@@ -44,7 +46,8 @@ transaction covers event row, entity row, datoms, and supersession lineage.
 - [x] `verify()` clean; raw UPDATE blocked by trigger and caught by `verify()`
 - [x] Superseded decision inactive in folds, readable via `store.history`
 - [x] Store refusals and MORe refusals independent
-- [x] All MORe tests green (110 at land)
+- [x] `decision` kind (ADR): title, body, more:topic, more:pin; helper `latest_live_decision`
+- [x] All MORe tests green (114 at land)
 - [x] Evidence frag `docs/frags/0015-more-store.md`
 
 ## Contract changes proposed
@@ -52,7 +55,8 @@ transaction covers event row, entity row, datoms, and supersession lineage.
 Applied in this branch (orchestrator merge):
 
 - **`seed.sql`**: attrs `more:type`, `more:actor`, `more:at`, `more:subject`,
-  `more:pin`, `more:body`; kind `more-event`.
+  `more:pin`, `more:body`, `more:topic`; kinds `more-event` and `decision`
+  (ADR: `title`, `body`, `more:topic`, `more:pin`).
 - **`db.connect`**: executes MORe `schema.sql` after store bootstrap so new
   store files carry both schemas.
 - **MORe `schema.sql`**: table `refusal` renamed to `more_refusal`.

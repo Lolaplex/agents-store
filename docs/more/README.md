@@ -18,6 +18,13 @@ admitted append, mints one ULID used as both `event.id` and `entity.id`, writes
 edges for supersession/overrule events. Refused envelopes go to `more_refusal`
 only (store `refusal` is for wrapper grant denials).
 
+**Decision artifacts (ADRs):** admitted `decision` events with `title`, `body`,
+and `topic` in the envelope are projected onto the store `decision` kind
+(`title`, `body`, `more:topic`, plus `more:pin` = `{entity_id}@{tx}`).
+`latest_live_decision(log, store, subject_ref=…, topic=…, at_tx=…)` returns the
+latest non-superseded decision using the same inactive-event fold as
+`status.py`; superseded records stay readable via `store.history()`.
+
 Standalone `EventLog(:memory:)` or a MORe-only sqlite file still works for the
 companion tests — no entity materialization without the store schema.
 

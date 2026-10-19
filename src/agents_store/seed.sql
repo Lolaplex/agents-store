@@ -12,10 +12,12 @@ INSERT OR IGNORE INTO attr (name, value_type, cardinality, doc) VALUES
   ('more:at',      'instant', 'one',  'MORe event timestamp (UTC ISO-8601 with Z)'),
   ('more:subject', 'text',    'many', 'MORe subject identifiers'),
   ('more:pin',     'text',    'many', 'version pin as entity@tx'),
-  ('more:body',    'json',    'one',  'MORe type-specific body');
+  ('more:body',    'json',    'one',  'MORe type-specific body'),
+  ('more:topic',   'text',    'one',  'MORe decision question / ADR topic');
 
 INSERT OR IGNORE INTO kind (name, required, optional, derivations) VALUES
   ('event', '["when"]',   '["end","title"]',  '[{"attr":"end","from":["when"],"rule":"plus_1h"}]'),
   ('task',  '["status"]', '["when","title"]', '[]'),
   ('note',  '["body"]',   '["title"]',        '[]'),
-  ('more-event', '["more:type","more:actor"]', '["more:at","more:subject","more:pin","more:body"]', '[]');
+  ('more-event', '["more:type","more:actor"]', '["more:at","more:subject","more:pin","more:body"]', '[]'),
+  ('decision', '["title","body","more:topic","more:pin"]', '["more:type","more:actor","more:at","more:subject"]', '[]');

@@ -48,6 +48,29 @@ def materialize_entity(conn: sqlite3.Connection, eid: str, tx_id: int, event: Ev
         "INSERT INTO datom (e, a, v, tx, added) VALUES (?, 'more:pin', ?, ?, 1)",
         (eid, f"{eid}@{tx_id}", tx_id),
     )
+    if event.type == "decision":
+        _materialize_adr(conn, eid, tx_id, body)
+
+
+def _materialize_adr(conn: sqlite3.Connection, eid: str, tx_id: int, body: dict) -> None:
+    """Project ADR fields onto the decision artifact kind (title, body, more:topic)."""
+    if "title" in body:
+        conn.execute(
+            "INSERT INTO datom (e, a, v, tx, added) VALUES (?, 'title', ?, ?, 1)",
+            (eid, str(body["title"]), tx_id),
+        )
+    text = body.get("body")
+    if text is not None:
+        conn.execute(
+            "INSERT INTO datom (e, a, v, tx, added) VALUES (?, 'body', ?, ?, 1)",
+            (eid, str(text), tx_id),
+        )
+    topic = body.get("topic")
+    if topic is not None:
+        conn.execute(
+            "INSERT INTO datom (e, a, v, tx, added) VALUES (?, 'more:topic', ?, ?, 1)",
+            (eid, str(topic), tx_id),
+        )
 
 
 def materialize_lineage(conn: sqlite3.Connection, eid: str, tx_id: int, event: Event) -> None:

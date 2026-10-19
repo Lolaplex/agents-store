@@ -29,3 +29,8 @@ def acceptance(subject, pin, tests, outcome="accepted"):
 
 def inclusion(subject, pin, into):
     return Event("inclusion", CI, (subject,), (pin,), body={"into": into, "from": "abc123..def456"})
+
+
+def adr(subject, pin, title, body, topic, status="decided", **extra):
+    """ADR-style decision with title, body and topic for the store ``decision`` kind."""
+    return decision(subject, pin, status=status, title=title, body=body, topic=topic, **extra)

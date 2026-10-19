@@ -2,7 +2,7 @@
 
 - commit: 55fb9b6
 - task: T17
-- claim: MORe events co-locate with the entity store; admitted events share id with entities; refusals use `more_refusal`; 110 MORe tests pass.
+- claim: MORe events co-locate with the entity store; ADR `decision` kind + `latest_live_decision`; 114 MORe tests pass.
 - evidence:
   ```bash
   git rev-parse HEAD
