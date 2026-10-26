@@ -4,7 +4,7 @@ One identity, many lawful projections.
 
 A thing (an event, a task, a note) is stored once with a minted ID, typed attributes, relations and an append-only history. Calendars, markdown folders and HTML panes are projections of it, not copies. A write through a projection is refused unless a certificate grants it.
 
-Status: **POC landed** (tag `poc-v1`); post-POC cards T13–T17 landed on `main` — **303 tests** (159 unit + 15 plugin + 15 acceptance + 114 MORe companion; inventory in `docs/AUDIT.md`). The agents-calendar subprocess witness exercises real CalDAV when the CLI is installed. See [docs/walkthrough.md](docs/walkthrough.md) to run it end to end, [docs/acceptance-matrix.md](docs/acceptance-matrix.md) for criterion status, [docs/tasks/](docs/tasks/README.md) for the task cards, [docs/MEGAPLAN.md](docs/MEGAPLAN.md) for the plan, [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the module map.
+Status: **POC landed** (tag `poc-v1` @ `e031973`); post-POC cards T13–T17 on `main` — **303 tests** at `e9f470868be05a5031217382bd0aa48583d09737` (159 unit + 15 plugin + 15 acceptance + 114 MORe companion; inventory in `docs/AUDIT.md`). The agents-calendar subprocess witness exercises real CalDAV when the acceptance extra is installed. See [docs/walkthrough.md](docs/walkthrough.md) to run it end to end, [docs/acceptance-matrix.md](docs/acceptance-matrix.md) for criterion status, [docs/tasks/](docs/tasks/README.md) for the task cards, [docs/MEGAPLAN.md](docs/MEGAPLAN.md) for the plan, [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the module map.
 
 ## POC target
 

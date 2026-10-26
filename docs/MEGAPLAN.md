@@ -59,7 +59,7 @@ The oldest thread underneath all of it: Nextcloud apps silo their data; schema�
 ## 4. The core model (rules)
 
 1. **Concepts/attributes are identified by name only** (koru proto rule), namespaced: `ical:DTSTART`, `md:title`, core `when`, `status`, `title`, `body`.
-2. **Values are content-addressed** (no identity). **Entities get a minted ID** (uuid4 hex), never reused, never derived from content or position.
+2. **Values are content-addressed** (no identity). **Entities get a minted ID** (ULID via `ids.mint()`), never reused, never derived from content or position.
 3. **References between entities are datoms with `ref` value type**, indexed on `(a, v)` so they can be queried both ways. Never opaque fields buried in content.
 4. **History is append-only:** `datom(e, a, v, tx, added)`; current state is a view; UPDATE/DELETE on `datom` abort via trigger.
 5. **Kinds are structural over named attributes, multiplicative, and graded:** kind = required attrs + optional attrs + declared derivations. Fit may be graded for ranking and reading; **writes require real attributes or a declared derivation**, and derived values are marked derived and never written back.
@@ -197,9 +197,9 @@ Seed attrs/kinds: `title`(text,one), `body`(text,one), `when`(instant,one), `end
 - **A11** The agents-calendar CLI (independent stdlib CalDAV client) lists, updates and deletes against the plugin, with etag semantics honoured (`If-Match`).
 
 ### 5.9 Verification commands
-- `python -m unittest discover -s tests -v` (core, stdlib only)
-- `python -m venv .venv && .venv\Scripts\python -m pip install -e . -e plugins/radicale_agents_store` then `.venv\Scripts\python -m unittest discover -s tests/plugin -v`
-- `.venv\Scripts\python -m radicale --config examples/radicale.config` + `python examples/demo.py` for the manual Thunderbird check (A1–A6).
+- `python3 -m venv .venv && .venv/bin/python -m pip install -e ".[acceptance]" -e plugins/radicale_agents_store` then `.venv/bin/python -m unittest discover -s tests -v` (303 at `main` HEAD; see `docs/AUDIT.md`)
+- Windows: `.venv\Scripts\python` instead of `.venv/bin/python`
+- `.venv/bin/python -m radicale --config examples/radicale.config` + `python examples/demo.py` for the manual Thunderbird check (A1–A6)
 
 ## 6. Phases after the POC
 

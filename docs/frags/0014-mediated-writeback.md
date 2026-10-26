@@ -52,7 +52,12 @@ semantics (file always wins); flagged in BACKLOG, not patched here.
 
 ## Evidence
 
+At T16 land (`42fc1ce`):
+
 ```
 .venv\Scripts\python -m unittest discover -s tests
 Ran 189 tests — OK
 ```
+
+Inventory at `main` after T17 (`e9f470868be05a5031217382bd0aa48583d09737`):
+**303** tests (159 unit + 15 plugin + 15 acceptance + 114 MORe companion).

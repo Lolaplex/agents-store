@@ -123,7 +123,7 @@ def check_event(e: Event, profile: Profile) -> list[Violation]:
         if e.body.get("kind") == "acceptance" and e.body.get("status") != "decided":
             v(ENVELOPE_INVALID, "an acceptance is only valid on a decided decision")
         # body.topic (optional): the question the decision answers, e.g.
-        # "acceptance_decision". Kernel addition (more-lean-model.md §12a);
+        # "acceptance_decision". Kernel addition (Cypoe/more-framework@e32e5c3:lean-model/more-lean-model.md §12a);
         # admission does not check it, as in Lean.
 
     if e.type == "inclusion" and not e.body.get("into"):
