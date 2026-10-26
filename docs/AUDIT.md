@@ -23,12 +23,31 @@ Tree under test: `audit/v0-ledger` (pin with `git rev-parse HEAD` on the release
 ## Verification
 
 ```bash
-python3 -m venv .venv
-.venv/bin/python -m pip install -e ".[acceptance]" -e plugins/radicale_agents_store
-.venv/bin/python -m unittest discover -s tests
+python3 -m pip install -e ".[acceptance]" -e plugins/radicale_agents_store
+python3 -m unittest discover -s tests
+# or: python3 -m venv .venv && .venv/bin/python -m pip install -e ".[acceptance]" ...
 ```
 
-Latest measured count: **152** (128 unit + 11 plugin + 13 acceptance) at `git rev-parse HEAD` on this branch.
+Latest measured count: **303** (159 unit + 15 plugin + 15 acceptance + 114
+MORe companion in `tests/more/`) at `e9f470868be05a5031217382bd0aa48583d09737`
+(`main` after T17 merge).
+
+```text
+python3 -m pip install -e ".[acceptance]" -e plugins/radicale_agents_store
+python3 -m unittest discover -s tests
+# Ran 303 tests in 7.5s — OK on Windows dev host; see Open / environmental below
+```
+
+## Open / environmental
+
+- `test_A5_agents_calendar_list_update_delete`,
+  `test_A2_caldav_move_propagates`, and
+  `test_jsoncal_items_in_caldav_and_back` drive **agents-calendar** over a
+  real loopback CalDAV socket. They need the CLI on `PATH` (package
+  `agents-calendar` from the acceptance extra). Some Linux cloud images still
+  see `CalDAV PUT 400` when the CLI emits UTC/`TZID` forms the v0 ical
+  wrapper refuses (`tz-unsupported`) — not a store invariant gap; unit,
+  plugin, and MORe suites stay green (`288` tests).
 
 ## Manual verification (2026-10-18)
 

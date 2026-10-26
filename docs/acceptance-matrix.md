@@ -22,8 +22,12 @@ Megaplan A8 (certification grants, disabling cert → refused): covered by
 `tests/unit/test_certify.py` (`test_pass_writes_cert_and_grants`,
 `test_fail_cert_no_grants`, `test_uncertified_wrapper_refused`).
 
-Run: `.venv\Scripts\python -m unittest discover -s tests`
-(156 tests: 128 unit + 15 plugin + 13 acceptance; ledger in `docs/AUDIT.md`).
+Run: `python3 -m pip install -e ".[acceptance]" -e plugins/radicale_agents_store`
+then `.venv\Scripts\python -m unittest discover -s tests` (or `python3 -m
+unittest discover -s tests`).
+
+**303 tests:** 159 unit + 15 plugin + 15 acceptance + 114 MORe companion
+(`tests/more/`). Inventory and environmental notes: `docs/AUDIT.md`.
 
 ## Known POC limits (documented, not bugs)
 

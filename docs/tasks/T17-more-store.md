@@ -67,4 +67,4 @@ See `docs/frags/0015-more-store.md`.
 
 ## commit
 
-7a02d7d
+e9f4708 (T17 merge on `main`; inventory refresh in docs consistency pass)

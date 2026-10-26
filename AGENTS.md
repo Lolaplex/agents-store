@@ -17,9 +17,10 @@ One identity, many lawful projections. The plan is the source of truth: `docs/ME
 ## Verification
 
 ```bash
-python -m unittest discover -s tests -v
+python3 -m pip install -e ".[acceptance]" -e plugins/radicale_agents_store
+python3 -m unittest discover -s tests -v
 python -m venv .venv
-.venv\Scripts\python -m pip install -e . -e plugins/radicale_agents_store
+.venv\Scripts\python -m pip install -e ".[acceptance]" -e plugins/radicale_agents_store
 .venv\Scripts\python -m unittest discover -s tests/plugin -v
 ```
 
@@ -32,9 +33,10 @@ Work is broken into self-contained cards under `docs/tasks/` (protocol in `docs/
 ## Current state
 
 POC frozen at tag `poc-v1` (commit `fff6ccc`, 156 tests). Megaplan
-§6.1 (generated mediators) complete through T16: jsoncal source,
-correspondence match+witness, generated mediator materialization,
-mediated write-back via CalDAV — **189 tests** green. Audit ledger:
-`docs/AUDIT.md`. Post-POC work continues in `docs/tasks/BACKLOG.md`
-(agent-rules projections, koru layer, file-adapter merge semantics,
-glue specialization).
+§6.1 (generated mediators) complete through T16 (189 tests at land).
+**T17** (MORe event log co-located with the entity store) landed on
+`main` — **303 tests** (159 unit + 15 plugin + 15 acceptance + 114
+MORe companion; pin with `git rev-parse HEAD` in `docs/AUDIT.md`).
+Audit ledger: `docs/AUDIT.md`. Post-POC work continues in
+`docs/tasks/BACKLOG.md` (agent-rules projections, koru layer,
+file-adapter merge semantics, glue specialization).
