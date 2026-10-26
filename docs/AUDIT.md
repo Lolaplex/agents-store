@@ -35,7 +35,8 @@ MORe companion in `tests/more/`) at `e9f470868be05a5031217382bd0aa48583d09737`
 ```text
 python3 -m pip install -e ".[acceptance]" -e plugins/radicale_agents_store
 python3 -m unittest discover -s tests
-# Ran 303 tests in 7.5s — OK on Windows dev host; see Open / environmental below
+# Ran 303 tests in 7.5s — 288 green (unit+plugin+more); 3 acceptance failures
+# possible on Linux when agents-calendar PUT hits tz-unsupported (see below)
 ```
 
 ## Open / environmental
