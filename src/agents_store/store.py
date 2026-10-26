@@ -7,14 +7,20 @@ transact() is the only write API. Its semantics:
   changes apply, ungranted ones become refusal rows — loudly recorded,
   never silently dropped, and the rest of the batch still applies;
 - cardinality 'one': asserting a different value retracts the current one
-  in the same tx; re-asserting the current value is a no-op.
+  in the same tx; re-asserting the current value is a no-op;
+- `entity=` pre-assigns the id of the entity the call creates (instead of
+  minting one), for callers whose records already carry an id (the MORe
+  event log: event id = entity id). The id must not exist yet;
+- `tx_changes=` (internal authority only) yields changes whose values need
+  the tx id this call opens, e.g. a version pin `entity@tx`. They are
+  applied in the same tx, after `changes`.
 """
 from __future__ import annotations
 
 import json
 import sqlite3
 from dataclasses import dataclass
-from typing import Any, Iterable, Sequence
+from typing import Any, Callable, Iterable, Sequence
 
 from . import ids
 from .contracts import Change, Datom, Refusal, TxOp
@@ -66,11 +72,17 @@ class Store:
         agent: str | None = None,
         op: TxOp = "assert",
         note: str | None = None,
+        entity: str | None = None,
+        tx_changes: Callable[[int, str | None], Iterable[Change]] | None = None,
     ) -> TxResult:
         # mediated write-back: an external write to a derived attr routes
         # through its correspondence back to the source attr (equal +
         # witnessed only); non-round-trippable writes are refused.
         from . import derive, grant as _grant
+        if tx_changes is not None and wrapper != _grant.INTERNAL_WRAPPER:
+            raise ValueError("transact: tx_changes is reserved for the internal authority")
+        if entity is not None and self._exists(entity):
+            raise ValueError(f"transact: entity {entity!r} already exists")
         refusals: list[Refusal] = []
         mediated: set[int] = set()
         planned: list[tuple[Change, str]] = []
@@ -95,13 +107,16 @@ class Store:
             "INSERT INTO tx (op, agent, wrapper, note) VALUES (?, ?, ?, ?)",
             (op, agent, wrapper, note),
         ).lastrowid
+        if tx_changes is not None:
+            # internal authority: no derived-attr mediation applies
+            planned.extend((ch, wrapper) for ch in tx_changes(tx_id, entity))
         minted: str | None = None
         applied: list[Datom] = []
         for ch, ch_wrapper in planned:
             e = ch.e
             if e is None:
                 if minted is None:
-                    minted = ids.mint()
+                    minted = entity if entity is not None else ids.mint()
                     self.conn.execute(
                         "INSERT INTO entity (id, created_tx) VALUES (?, ?)",
                         (minted, tx_id),
