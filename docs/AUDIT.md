@@ -1,6 +1,11 @@
 # v0 POC audit ledger
 
-Tree under test: `audit/v0-ledger` (pin with `git rev-parse HEAD` on the release tag).
+Scenario rows below were verified on branch `audit/v0-ledger` against
+application code at `04acfaf`. Tag `v0` (`2ba84239`) is the release
+record: same application tree as `04acfaf` plus only `docs/AUDIT.md`
+and `docs/ROADMAP.md` (see `git diff 04acfaf 2ba8423`). Current
+`main` test inventory is in **Verification** (measured at
+`e9f470868be05a5031217382bd0aa48583d09737`).
 
 | Scenario | Setup | Expected invariant | Test / witness | Result |
 |----------|-------|-------------------|----------------|--------|
@@ -28,19 +33,41 @@ python3 -m venv .venv
 .venv/bin/python -m unittest discover -s tests
 ```
 
-Latest measured count: **152** (128 unit + 11 plugin + 13 acceptance) at `git rev-parse HEAD` on this branch.
+Latest measured count at **`e9f470868be05a5031217382bd0aa48583d09737`**
+(`origin/main`): **303** (159 unit + 15 plugin + 15 acceptance + 114
+MORe companion in `tests/more/`).
+
+```text
+python3 -m pip install -e ".[acceptance]" -e plugins/radicale_agents_store
+python3 -m unittest discover -s tests/unit -q    # Ran 159 tests — OK
+python3 -m unittest discover -s tests/plugin -q   # Ran 15 tests — OK
+python3 -m unittest discover -s tests/more -q     # Ran 114 tests — OK
+python3 -m unittest discover -s tests/acceptance -q  # Ran 15 tests (env-dependent)
+python3 -m unittest discover -s tests             # Ran 303 tests
+```
+
+## Open / environmental
+
+- `test_A5_agents_calendar_list_update_delete`,
+  `test_A2_caldav_move_propagates`, and
+  `test_jsoncal_items_in_caldav_and_back` drive **agents-calendar**
+  (`pyproject.toml` acceptance extra pins
+  `Lolaplex/agents-calendar@2680dbb`) over a real loopback CalDAV socket.
+  They need the CLI on `PATH`. Some Linux hosts still see `CalDAV PUT 400`
+  when emitted ICS uses forms the v0 ical wrapper refuses (`tz-unsupported`);
+  unit, plugin, and MORe suites stay green (**288** tests).
 
 ## Manual verification (2026-10-18)
 
 - **Verified by:** Fabian Schindler, by hand.
-- **Tree:** `main` @ `04acfaf987cbaba2a0c7b8f87a75c35ee638997b` ("docs: pin frag 0014 to 42fc1ce").
+- **Tree:** application code `04acfaf`; release tag `v0` @ `2ba84239`
+  records this pass plus `docs/ROADMAP.md` (code-identical to `04acfaf`).
 - **Client:** Thunderbird against the Radicale projection. This is the manual A1–A6 check
   from MEGAPLAN §5.9.
 - **Covered additionally:** in Fabian's words, "additions … with a json schema and
   mediator". In this tree that's the jsoncal wrapper (T13) and the generated mediator
   with mediated write-back (T14–T16, MEGAPLAN §6.1).
 - **Result:** pass. Fabian's report: the POC goal is met.
-- **Consequence:** this tree is the v0 freeze candidate. The tag is created by hand on
-  this SHA. After that, v0 takes only fixes; new work follows `docs/ROADMAP.md`.
+- **Consequence:** tag `v0` marks the freeze; after that, v0 takes only fixes; new work follows `docs/ROADMAP.md`.
 - **Gap:** no automated witness covers the Thunderbird UI. This row is Fabian's
   observation, not a test result.

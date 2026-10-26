@@ -47,7 +47,7 @@ transaction covers event row, entity row, datoms, and supersession lineage.
 - [x] Superseded decision inactive in folds, readable via `store.history`
 - [x] Store refusals and MORe refusals independent
 - [x] `decision` kind (ADR): title, body, more:topic, more:pin; helper `latest_live_decision`
-- [x] All MORe tests green (114 at land)
+- [x] All MORe tests green (114 at `e9f4708`)
 - [x] Evidence frag `docs/frags/0015-more-store.md`
 
 ## Contract changes proposed
@@ -67,4 +67,4 @@ See `docs/frags/0015-more-store.md`.
 
 ## commit
 
-7a02d7d
+e9f470868be05a5031217382bd0aa48583d09737 (`main` after T17 merge)

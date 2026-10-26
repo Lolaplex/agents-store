@@ -1,6 +1,6 @@
 {
   "version": 4,
-  "status": "proposal v4 (not pushed): v3 + append-only decision/evidence events as core primitives (Koru git practice + BEL Nachweis/Entscheidung). v3 kept as kernel-proposal.v3.json",
+  "status": "vendored from Cypoe/more-framework@3681d271 (kernel-impl tip e32e5c3); v4 adds append-only decision/evidence events as core primitives",
   "description": "Lean MORe kernel. One invariant organises everything: every artifact is held exactly once; everything else is a pointer or a lossless, regenerable projection. Relations, gates, lifecycle and profiles are layered on the four core primitives.",
   "sources": {
     "HOME": "more-framework.org home: 'Eine Spezifikation. Viele Ableitungen. Keine zweite Wahrheit.'",
@@ -14,7 +14,7 @@
     "ZOHO": "Beispiel ZOHO ONE Meeting-Schaltflaeche V8.0 (Confluence export v.9, 2026-07-14, /download/beispiele/)",
     "DEMO": "more-framework.org/demo/index.html bundle assets/index-Cy1hzhS9.js (UC-042 Adressaenderung, R-17)",
     "US": "Whitepaper User Stories im regulierten Umfeld (DE/EN, 2026-07-26)",
-    "inventory": "see /workspace/more/sources.md",
+    "inventory": "Cypoe/more-framework@e32e5c3:lean-model/kernel-proposal.json (sources block)",
     "KORU": "korulang/koru git log @24c1538c0 (3,756 commits) + hooks/commit-msg.cjs + membrane SKILL; see /workspace/koru-distill/DISCIPLINE.md §9-10",
     "WPUS": "Why User Stories Are Not Enough in Regulated Environments (EN, 2026-07-26)",
     "LEI": "site /leistungen (fetched 2026-10-17)",
@@ -801,7 +801,7 @@
         ],
         "schedule_layers_note": "board-specific; not MORe. Do not name the schedule layer 'baseline' in MORe-facing APIs (clashes with configuration baseline)."
       },
-      "duplication_audit": "see more-lean-model.md §5"
+      "duplication_audit": "Cypoe/more-framework@e32e5c3:lean-model/more-lean-model.md §5"
     }
   },
   "notes_v4": {
@@ -995,7 +995,7 @@
         ]
       },
       {
-        "phase": "Test & Abnahme",
+        "phase": "Test & acceptance (JWF: Test & Abnahme)",
         "states": [
           "Im fachlichen Test",
           "Test abgeschlossen",
@@ -1080,21 +1080,21 @@
         "BEL §5.2: 'Die Abnahme bezieht sich ausdrücklich auf einen identifizierten Versionsstand.'"
       ]
     },
-    "approval_path": "JWF names one approval: the Freigabe / Abnahmeentscheidung (p.7 'Fachliche Prüfung und Freigabe'; p.9 'fachliche Abnahme', 'Abnahmeentscheidung'). It is the acceptance decision (jira_status_model.acceptance), which reaches Abgenommen and is the QG3 guard 'freigegeben'. No gate has a further approval step: p.10 lists no decision among the QG guards. Board roles: PO/Fachbereich, Entwicklung, Test/Abnahme, Release/Team (p.9).",
+    "approval_path": "JWF names one approval: the release / acceptance decision (JWF: Freigabe / Abnahmeentscheidung; p.7 'Fachliche Prüfung und Freigabe'; p.9 'fachliche Abnahme', 'Abnahmeentscheidung'). It is the acceptance decision (jira_status_model.acceptance), which reaches Accepted (JWF state 'Abgenommen') and is the QG3 guard 'freigegeben'. No gate has a further approval step: p.10 lists no decision among the QG guards. Board roles: PO/Fachbereich, Entwicklung, Test/Abnahme, Release/Team (p.9).",
     "mapping_to_v4": {
       "note": "Jira states are kept as a derived status model (governance_concepts.status_model): each state is a fold over v4 events, never written. Mapping is ours; the deck does not use event vocabulary.",
       "Neu..In technischer Beschreibung": "derived from decision events (selection, open DECs) and authored artifacts",
       "Fertig für Einplanung (=Ready)": "derived: no open decision + QG1 guards held as verification events pinned to subject@v",
       "Fertig für Entwicklung..Fertig zum Testen": "derived from implementation pointers + verification events (technische QS)",
       "Im fachlichen Test / Test abgeschlossen": "verification events pinned to subject@v",
-      "In Abnahme / Abgenommen": "In Abnahme = QG2 held (implements claim met + verified + no open decision). Abgenommen = the acceptance decision (jira_status_model.acceptance), a decision event, never a status",
+      "In Abnahme / Abgenommen": "In acceptance (JWF 'In Abnahme') = QG2 held (implements claim met + verified + no open decision). Accepted (JWF 'Abgenommen') = the acceptance decision (jira_status_model.acceptance), a decision event, never a status",
       "Produktion": "derived_status.done: inclusion into a release (Release zugeordnet) + verified + accepted. Kernel derivation: JWF gives the state no condition; the p.9 Release / Team board lists 'Freigegebene Stände, Release-Zuordnung, Produktionsstatus, offene Nachweise'",
-      "Geschlossen": "QG3 held (JWF p.7: 'Produktion / QG 3 ... Produktiver und geschlossener Stand'): acceptance decision + inclusion + production verification pinned to the release baseline (derived_status.proven_in_production); derived terminal fold, no event writes it. Geschlossen implies derived_status.done; done alone is not Geschlossen",
-      "Done": "the deck has no 'Done' state, only DoD as a phase (p.7). Any Jira 'Done' maps to derived_status.done; setting 'Done' or 'Geschlossen' by hand is status_hand_set"
+      "Geschlossen": "Closed (JWF 'Geschlossen'): QG3 held (JWF p.7: 'Produktion / QG 3 ... Produktiver und geschlossener Stand') — acceptance decision + inclusion + production verification pinned to the release baseline (derived_status.proven_in_production); derived terminal fold, no event writes it. Closed implies derived_status.done; done alone is not Closed",
+      "Done": "the deck has no 'Done' state, only DoD as a phase (p.7). Any Jira 'Done' maps to derived_status.done; setting 'Done' or Closed (JWF 'Geschlossen') by hand is status_hand_set"
     },
     "reflow_cutover": "NOT in JWF. Neither word nor any rescheduling, rollback or cut-over step appears in the 13 pages. The v3 finding stands: reflow has no MORe source; cut-over appears only as BEL §7.3 example domain (UC-COP-011/DEC-COP-001).",
     "kernel_additions": {
-      "note": "rules of the JWF mapping with no source text; kept on purpose (more-lean-model.md §12a)",
+      "note": "rules of the JWF mapping with no source text; kept on purpose (Cypoe/more-framework@e32e5c3:lean-model/more-lean-model.md §12a)",
       "decision.topic": {
         "rule": "a decision event names the question it answers (e.g. 'acceptance_decision'); the kernel reads only acceptance_decision",
         "reason": "without it, any decided decision with an acceptance (e.g. an unrelated PO decision) would count as the acceptance decision",

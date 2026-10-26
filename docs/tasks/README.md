@@ -51,7 +51,13 @@ T13 jsoncal wrapper+jsonfile ─┐
 T14 correspondence match ─────┴─ T15 derive (materialize) ── T16 write-back+accept
 ```
 
-Parallel-ready now: **T13 ∥ T14**.
+MORe companion + store bridge (after kernel port landed):
+
+```
+T17 MORe event log in entity store (done)
+```
+
+Parallel at kickoff: **T13 ∥ T14**.
 
 ## Verification command (all cards)
 

@@ -17,13 +17,14 @@ One identity, many lawful projections. The plan is the source of truth: `docs/ME
 ## Verification
 
 ```bash
-python -m unittest discover -s tests -v
-python -m venv .venv
-.venv\Scripts\python -m pip install -e . -e plugins/radicale_agents_store
-.venv\Scripts\python -m unittest discover -s tests/plugin -v
+python3 -m venv .venv
+.venv/bin/python -m pip install -e ".[acceptance]" -e plugins/radicale_agents_store
+.venv/bin/python -m unittest discover -s tests -v
 ```
 
-Manual pass for A1–A6: `.venv\Scripts\python -m radicale --config examples/radicale.config`, then `python examples/demo.py` and check in Thunderbird. Full transcript + Thunderbird checklist: `docs/walkthrough.md`. Status per criterion: `docs/acceptance-matrix.md`.
+Windows: use `.venv\Scripts\python` instead of `.venv/bin/python`.
+
+Manual pass for A1–A6: `.venv/bin/python -m radicale --config examples/radicale.config` (Windows: `.venv\Scripts\python -m radicale ...`), then `python examples/demo.py` and check in Thunderbird. Full transcript + Thunderbird checklist: `docs/walkthrough.md`. Status per criterion: `docs/acceptance-matrix.md`.
 
 ## Picking up work (subagents)
 
@@ -31,10 +32,12 @@ Work is broken into self-contained cards under `docs/tasks/` (protocol in `docs/
 
 ## Current state
 
-POC frozen at tag `poc-v1` (commit `fff6ccc`, 156 tests). Megaplan
-§6.1 (generated mediators) complete through T16: jsoncal source,
-correspondence match+witness, generated mediator materialization,
-mediated write-back via CalDAV — **189 tests** green. Audit ledger:
-`docs/AUDIT.md`. Post-POC work continues in `docs/tasks/BACKLOG.md`
-(agent-rules projections, koru layer, file-adapter merge semantics,
-glue specialization).
+POC frozen at annotated tag `poc-v1` (`git rev-parse poc-v1^{commit}` →
+`e031973`, 156 tests at freeze). Megaplan §6.1 (generated mediators)
+complete through T16 (189 tests at T16 land). **T17** (MORe event log
+co-located with the entity store) landed on `main` — **303 tests**
+(159 unit + 15 plugin + 15 acceptance + 114 MORe companion) at
+`e9f470868be05a5031217382bd0aa48583d09737` (`origin/main` HEAD when
+measured). Audit ledger: `docs/AUDIT.md`. Post-POC work continues in
+`docs/tasks/BACKLOG.md` (agent-rules projections, koru layer,
+file-adapter merge semantics, glue specialization).

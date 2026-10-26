@@ -1,4 +1,4 @@
-"""Append-only event log over sqlite3 (more-lean-model.md §8 rules: no
+"""Append-only event log over sqlite3 (Cypoe/more-framework@e32e5c3:lean-model/more-lean-model.md §8 rules: no
 update, no delete; ending anything is an event).
 
 Each row carries a hash chain: digest = sha256(prev || id || canonical

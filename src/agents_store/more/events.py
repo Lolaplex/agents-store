@@ -1,4 +1,4 @@
-"""Event: the fifth core primitive (more-lean-model.md §8, kernel
+"""Event: the fifth core primitive (Cypoe/more-framework@e32e5c3:lean-model/more-lean-model.md §8, kernel
 core_primitives.event). Immutable, append-only, the only write path for
 state. One envelope for all six types; type-specific fields live in `body`.
 """

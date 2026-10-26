@@ -2,12 +2,32 @@
 
 The Python MORe v4 companion from [Cypoe/more-framework](https://github.com/Cypoe/more-framework) lives under `src/agents_store/more/`. Spec data is vendored as `kernel-proposal.json` beside the package; profile knobs are in `profiles/default.json`.
 
-Porting contract and Lean reference: **`kernel/More/PORTING.md`** in more-framework (do not restate kernel semantics here).
+## Vendoring pin
+
+Companion modules and `kernel-proposal.json` match
+[Cypoe/more-framework](https://github.com/Cypoe/more-framework) at merge
+**`3681d271`** on `master` (PR #5 *kernel-impl*; branch tip **`e32e5c3`**).
+Upstream layout at that revision:
+
+| agents-store | more-framework @ `e32e5c3` |
+|---|---|
+| `src/agents_store/more/*.py` | `companion/python/more_kernel/*.py` |
+| `src/agents_store/more/kernel-proposal.json` | `lean-model/kernel-proposal.json` |
+| `tests/more/` | `companion/python/tests/` (+ store integration tests) |
+
+Porting contract and Lean reference:
+`Cypoe/more-framework@e32e5c3:kernel/More/PORTING.md` (do not restate kernel
+semantics here). Normative prose:
+`Cypoe/more-framework@e32e5c3:lean-model/more-lean-model.md`.
+
+JWF board **state spellings** in profile JSON and tests remain the German
+labels from the neutralised workflow deck (e.g. `In Abnahme`, `Abgenommen`,
+`Geschlossen`); English names appear in module docstrings and this README.
 
 ## Loaded here
 
 - Event log, checks, derived status, gates, JWF board state, relations, readiness, hierarchy lint, compliance projection, cut-over profile
-- Companion unit tests in `tests/more/`
+- Companion unit tests in `tests/more/` (**114** at `e9f470868be05a5031217382bd0aa48583d09737`)
 
 ## Store integration (T17)
 

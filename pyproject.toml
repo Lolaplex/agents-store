@@ -15,7 +15,7 @@ dependencies = []
 
 [project.optional-dependencies]
 acceptance = [
-  "agents-calendar @ git+https://github.com/Lolaplex/agents-calendar.git",
+  "agents-calendar @ git+https://github.com/Lolaplex/agents-calendar.git@2680dbb0938d57b4f0717a6b41009e2f7830fa6f",
   "radicale",
   "vobject",
 ]
