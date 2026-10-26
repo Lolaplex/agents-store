@@ -6,7 +6,8 @@ A gate is the condition of one transition (JWF p.10: "Die Bedingungen
 liegen dort, wo der Status wechselt"). It holds when drift is clean on
 what it touches and its JWF p.10 guards hold; QG1 also needs Ready. No
 gate has an approval step. The acceptance decision is not a gate: it
-reaches Abgenommen and is also the QG3 guard "freigegeben".
+reaches Accepted (JWF state "Abgenommen") and is also the QG3 guard
+"freigegeben" (released).
 
 The board state is never set: it is the longest prefix of 14 true
 conditions, so each state implies all earlier ones.

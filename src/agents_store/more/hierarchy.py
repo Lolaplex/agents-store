@@ -1,4 +1,4 @@
-"""Hierarchy and the one_question lint (more-lean-model.md §10, kernel
+"""Hierarchy and the one_question lint (Cypoe/more-framework@e32e5c3:lean-model/more-lean-model.md §10, kernel
 hierarchy). Fachgebiet -> Anwendungsfall -> BP|CM|UI|API|TC|AC|DEC; each
 level declares one question in the profile, each node answers its own
 level's question and no other.

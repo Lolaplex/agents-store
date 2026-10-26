@@ -9,6 +9,8 @@ is `docs/MEGAPLAN.md`; the work breakdown is `docs/tasks/`.
 adapters/   I/O shells: folders, servers, files. The only place open()/listen() happens.
 wrappers/   Pure lenses: EntityView <-> representation text. No I/O, no clock, no RNG.
 core        Store, datoms, lineage, kinds, grants, registry, mediator, pane.
+more/       MORe v4 companion (event log, checks, JWF); T17 bridges admitted events
+            into the entity store (see docs/more/README.md). Tests in tests/more/.
 schema.sql  Contract DDL. Changes here are contract changes (docs/tasks/README.md).
 ```
 

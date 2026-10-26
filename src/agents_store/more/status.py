@@ -1,4 +1,4 @@
-"""Derived status (more-lean-model.md §9, kernel derived_status).
+"""Derived status (Cypoe/more-framework@e32e5c3:lean-model/more-lean-model.md §9, kernel derived_status).
 
 No status is stored or written. derive() folds the event log for one
 subject@version into the chain

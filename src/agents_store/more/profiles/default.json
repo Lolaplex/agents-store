@@ -1,7 +1,7 @@
 {
   "_doc": "Implementation settings for the reference kernel. Everything domain-level (levels, questions, the JWF status model) is read from lean-model/kernel-proposal.json; this file holds only the knobs the spec leaves open. Each key names the spec gap it fills.",
   "done_requires_acceptance": true,
-  "_done_requires_acceptance": "more-lean-model.md §9: 'done = inclusion + gate-accepted passing verification' vs. the state order verified -> accepted -> released(=done). true = released needs the business-acceptance decision too.",
+  "_done_requires_acceptance": "Cypoe/more-framework@e32e5c3:lean-model/more-lean-model.md §9: 'done = inclusion + gate-accepted passing verification' vs. the state order verified -> accepted -> released(=done). true = released needs the business-acceptance decision too.",
   "status_keys": ["status", "state", "derived_status", "workflow_state", "jira_status", "done", "ready", "released", "accepted"],
   "status_event_types": ["status", "set_status", "status_change", "transition", "move_to_done"],
   "acceptance_values": ["accepted", "approved", "abgenommen", "in abnahme", "freigegeben", "akzeptiert"],
@@ -9,7 +9,7 @@
   "decision_statuses": ["open", "decided"],
   "verification_results": ["pass", "fail", "deviation"],
   "verification_stages": ["test", "production", "review"],
-  "_verification_stages": "review is a kernel addition (more-lean-model.md §12a): a QG1 guard check, never a test verification.",
+  "_verification_stages": "review is a kernel addition (Cypoe/more-framework@e32e5c3:lean-model/more-lean-model.md §12a): a QG1 guard check, never a test verification.",
   "validator_methods": ["validator", "schema_validation"],
   "_validator_methods": "verification methods that count as validation for validated_by claims (Lean Profile.validatorMethods).",
   "relevant": {
