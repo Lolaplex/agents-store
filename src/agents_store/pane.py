@@ -50,10 +50,10 @@ def targets(conn: sqlite3.Connection, reg: Registry, e: str) -> set[str]:
 
 def render(conn: sqlite3.Connection, reg: Registry, e: str, target: str) -> Artifact | Refusal:
     if target not in targets(conn, reg, e):
-        return Refusal("pane", "no-capability-path", e=e, a=target)
+        return Refusal("pane", "no_capability_path", e=e, a=target)
     art = mediate(conn, reg, e, target)
     if art is None:  # path vanished between targets() and mediate — treat as refusal
-        return Refusal("pane", "no-capability-path", e=e, a=target)
+        return Refusal("pane", "no_capability_path", e=e, a=target)
     return art
 
 

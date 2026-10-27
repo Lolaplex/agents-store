@@ -92,16 +92,16 @@ class TestIngest(JsonfileCase):
                     {"uid": "ok2", "summary": "y"}])
         rep = jsonfile.sync(self.store, self.path)
         self.assertEqual(rep.created, 2)
-        self.assertTrue(any(r.reason == "parse-fail" for r in rep.refusals))
+        self.assertTrue(any(r.reason == "parse_fail" for r in rep.refusals))
         rows = self.conn.execute(
             "SELECT reason FROM refusal WHERE wrapper='jcal'").fetchall()
-        self.assertIn(("parse-fail",), rows)
+        self.assertIn(("parse_fail",), rows)
 
     def test_garbage_file_refused(self):
         self.path.write_text("{not json", encoding="utf-8")
         rep = jsonfile.sync(self.store, self.path)
         self.assertEqual(rep.created, 0)
-        self.assertTrue(any(r.reason == "parse-fail" for r in rep.refusals))
+        self.assertTrue(any(r.reason == "parse_fail" for r in rep.refusals))
 
     def test_no_uid_mints_then_stable(self):
         self.write([{"summary": "no id here"}])

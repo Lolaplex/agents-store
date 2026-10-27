@@ -80,16 +80,16 @@ def sync(store: Store, root: str | Path, w: MarkdownWrapper | None = None) -> Sy
         try:
             fid = w.peek_id(text)
         except _ParseFail as ex:
-            rep.refusals.append(_refuse(store, "md", "parse-fail", payload=f"{rel}: {ex}"))
+            rep.refusals.append(_refuse(store, "md", "parse_fail", payload=f"{rel}: {ex}"))
             continue
 
         if fid is not None and not store.exists(fid):
-            rep.refusals.append(_refuse(store, "md", "unknown-entity", e=fid, payload=rel))
+            rep.refusals.append(_refuse(store, "md", "unknown_entity", e=fid, payload=rel))
             continue
 
         owner = _path_owner(store, rel)
         if owner is not None and owner != fid:
-            rep.refusals.append(_refuse(store, "md", "path-collision", e=fid, payload=rel))
+            rep.refusals.append(_refuse(store, "md", "path_collision", e=fid, payload=rel))
             continue
 
         view = store.view(fid) if fid else {}

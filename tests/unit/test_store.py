@@ -73,10 +73,10 @@ class TestTransact(unittest.TestCase):
         ).entity  # store is internal authority
         r = self.store.transact([Change(e=e, a="title", v="y")], wrapper="test")
         self.assertEqual(len(r.refusals), 1)
-        self.assertEqual(r.refusals[0].reason, "no-grant")
+        self.assertEqual(r.refusals[0].reason, "no_grant")
         self.assertEqual(self.store.view(e)["title"], "x")  # unchanged
         row = self.conn.execute("SELECT reason FROM refusal").fetchone()
-        self.assertEqual(row[0], "no-grant")
+        self.assertEqual(row[0], "no_grant")
 
     def test_grant_then_write(self):
         _wrapper(self.conn)
@@ -92,12 +92,12 @@ class TestTransact(unittest.TestCase):
         _wrapper(self.conn)
         e = self.store.transact([Change(e=None, a="title", v="x")], wrapper="store").entity
         r = self.store.transact([Change(e=e, a="bogus:attr", v="v")], wrapper="test")
-        self.assertEqual(r.refusals[0].reason, "unknown-attr")
+        self.assertEqual(r.refusals[0].reason, "unknown_attr")
 
     def test_unknown_entity_refused(self):
         _wrapper(self.conn)
         r = self.store.transact([Change(e="noentity", a="title", v="x")], wrapper="test")
-        self.assertEqual(r.refusals[0].reason, "unknown-entity")
+        self.assertEqual(r.refusals[0].reason, "unknown_entity")
 
     def test_internal_wrapper_bypasses_grants(self):
         # 'store' needs no grant_ rows — substrate authority for identity ops

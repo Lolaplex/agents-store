@@ -124,7 +124,7 @@ class TestMaterialize(unittest.TestCase):
         self.assertEqual(rep["conflicts"], 1)
         self.assertEqual(store.view(e)["when"], "2026-01-01T00:00:00Z")
         rows = conn.execute(
-            "SELECT reason FROM refusal WHERE reason='mediator-conflict'"
+            "SELECT reason FROM refusal WHERE reason='mediator_conflict'"
         ).fetchall()
         self.assertEqual(len(rows), 1)
 

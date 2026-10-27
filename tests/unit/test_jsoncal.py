@@ -71,13 +71,13 @@ class TestPut(unittest.TestCase):
     def test_tz_refusal(self):
         res = W.put('{"uid": "u1", "dtstart": "2026-12-01T10:00:00+01:00"}',
                     "E1", {"jcal:uid": "u1"})
-        self.assertEqual(res.refusals[0].reason, "tz-unsupported")
+        self.assertEqual(res.refusals[0].reason, "tz_unsupported")
 
     def test_parse_fail(self):
         res = W.put('{"uid": 1', "E1", {})
-        self.assertEqual(res.refusals[0].reason, "parse-fail")
+        self.assertEqual(res.refusals[0].reason, "parse_fail")
         res = W.put('[1,2]', "E1", {})
-        self.assertEqual(res.refusals[0].reason, "parse-fail")
+        self.assertEqual(res.refusals[0].reason, "parse_fail")
 
     def test_retract_on_absent_key(self):
         v = {"jcal:uid": "u1", "jcal:summary": "d", "jcal:status": "confirmed"}

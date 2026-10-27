@@ -51,16 +51,16 @@ class TestGetPut(unittest.TestCase):
     def test_id_mismatch_refused(self):
         rep = W.get("E1", {"body": "b"})
         res = W.put(rep, "OTHER", {"body": "b"})
-        self.assertEqual(res.refusals[0].reason, "id-mismatch")
+        self.assertEqual(res.refusals[0].reason, "id_mismatch")
         self.assertEqual(res.changes, ())
 
     def test_parse_fail_unterminated(self):
         res = W.put("---\nid: E1\ntitle: no end", "E1", None)
-        self.assertEqual(res.refusals[0].reason, "parse-fail")
+        self.assertEqual(res.refusals[0].reason, "parse_fail")
 
     def test_parse_fail_bad_line(self):
         res = W.put("---\nid: E1\nnot a kv\n---\nbody", "E1", None)
-        self.assertEqual(res.refusals[0].reason, "parse-fail")
+        self.assertEqual(res.refusals[0].reason, "parse_fail")
 
     def test_extra_keys_lossless(self):
         view = {"title": "t", "md:extra": {"custom": "v"}, "body": "b"}

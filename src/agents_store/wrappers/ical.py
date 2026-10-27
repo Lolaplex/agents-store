@@ -8,12 +8,12 @@ Declared mapping (the round-trip set certification covers):
 Shape rules:
 - VTODO iff `status` present (both when+status -> VTODO; a task is more
   specific than an event). VEVENT iff `when` present and no `status`.
-- UTC Z times only: TZID / floating -> refusal 'tz-unsupported'.
+- UTC Z times only: TZID / floating -> refusal 'tz_unsupported'.
 - STATUS values map open<->NEEDS-ACTION, done<->COMPLETED; anything else
-  in -> 'status-map' refusal.
+  in -> 'status_map' refusal.
 - Every prop we don't map is preserved verbatim in `ical:extra` (a JSON
   list of raw lines) and re-emitted — lossless, never silently dropped.
-- Exactly one VEVENT/VTODO per representation; else 'parse-fail'.
+- Exactly one VEVENT/VTODO per representation; else 'parse_fail'.
 """
 from __future__ import annotations
 
@@ -111,11 +111,11 @@ class ICalWrapper:
         try:
             comp, props, extra = _parse(rep)
         except _ParseFail as f:
-            return PutResult(refusals=(Refusal("ical", "parse-fail", e=e, payload=str(f)),))
+            return PutResult(refusals=(Refusal("ical", "parse_fail", e=e, payload=str(f)),))
         uid = props["UID"][1] if "UID" in props else None
         if e is not None and uid is not None and uid != e:
             return PutResult(refusals=(
-                Refusal("ical", "uid-mismatch", e=e, payload=f"UID {uid} != {e}"),))
+                Refusal("ical", "uid_mismatch", e=e, payload=f"UID {uid} != {e}"),))
         te = e or uid
         # timezone law: only Z times
         for name in ("DTSTART", "DTEND", "DUE"):
@@ -123,10 +123,10 @@ class ICalWrapper:
                 pname, pval = props[name]
                 if "TZID" in pname or not pval.strip().endswith("Z"):
                     return PutResult(refusals=(
-                        Refusal("ical", "tz-unsupported", e=te, a="when", payload=pval),))
+                        Refusal("ical", "tz_unsupported", e=te, a="when", payload=pval),))
         if "STATUS" in props and props["STATUS"][1] not in _STATUS_FROM_ICAL:
             return PutResult(refusals=(
-                Refusal("ical", "status-map", e=te, a="status", payload=props["STATUS"][1]),))
+                Refusal("ical", "status_map", e=te, a="status", payload=props["STATUS"][1]),))
 
         v = view or {}
         changes: list[Change] = []

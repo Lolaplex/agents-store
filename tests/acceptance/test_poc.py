@@ -367,7 +367,7 @@ class TestA8MalformedRefused(PocCase):
             "END:VEVENT\r\nEND:VCALENDAR\r\n",
             {"If-None-Match": "*"})
         self.assertEqual(status, 400)
-        self.assertTrue(any(r.reason == "tz-unsupported"
+        self.assertTrue(any(r.reason == "tz_unsupported"
                             for r in self.store.refusals()))
 
     def test_A8_md_id_edit_refused(self):
@@ -415,7 +415,7 @@ class TestA10LossyWriteRefused(PocCase):
             "END:VEVENT\r\nEND:VCALENDAR\r\n",
             {"If-None-Match": "*"})
         self.assertEqual(status, 400)
-        self.assertTrue(any(r.reason == "tz-unsupported"
+        self.assertTrue(any(r.reason == "tz_unsupported"
                             for r in self.store.refusals()))
 
 

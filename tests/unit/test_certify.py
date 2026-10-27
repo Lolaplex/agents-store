@@ -122,13 +122,13 @@ class TestCertifyAndGrant(unittest.TestCase):
         self.assertEqual(self.store.view(r.entity)["ll:x"], "hello")
 
     def test_uncertified_wrapper_refused(self):
-        # attrs registered but no certificate: refusal is no-grant, not unknown-attr
+        # attrs registered but no certificate: refusal is no_grant, not unknown_attr
         from agents_store.certify import register_wrapper
         w = Lossless()
         register_wrapper(self.conn, w)
         res = w.put(w.get("e", {"ll:x": "x"}), None, None)
         r = self.store.transact(res.changes, wrapper="ll")
-        self.assertEqual(r.refusals[0].reason, "no-grant")
+        self.assertEqual(r.refusals[0].reason, "no_grant")
 
     def test_attrs_registered(self):
         certify(self.conn, Lossless(), CORPUS)

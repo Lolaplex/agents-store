@@ -23,8 +23,8 @@ class TestContracts(unittest.TestCase):
         self.assertEqual(r.refusals, ())
 
     def test_refusal_fields(self):
-        r = Refusal(wrapper="md", reason="no-grant", e="e1", a="body")
-        self.assertEqual(r.reason, "no-grant")
+        r = Refusal(wrapper="md", reason="no_grant", e="e1", a="body")
+        self.assertEqual(r.reason, "no_grant")
 
     def test_protocol_is_runtime_checkable(self):
         self.assertTrue(hasattr(Wrapper, "__protocol_attrs__") or issubclass(Wrapper, object))
