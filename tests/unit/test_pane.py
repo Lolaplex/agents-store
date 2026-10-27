@@ -1,7 +1,7 @@
 """pane: targets gating + render."""
 import unittest
 
-from agents_store import Change, Refusal, connect
+from agents_store import Change, WriteRefusal, connect
 from agents_store.capabilities.entity_html import EntityHtml
 from agents_store.capabilities.markdown_html import MarkdownHtml
 from agents_store.mediator import Artifact, wrapper_capability
@@ -42,7 +42,7 @@ class TestPane(unittest.TestCase):
         e = self.make({"title": "T"})
         self.assertEqual(targets(self.conn, self.reg, e), set())
         r = render(self.conn, self.reg, e, "html")
-        self.assertIsInstance(r, Refusal)
+        self.assertIsInstance(r, WriteRefusal)
         self.assertEqual(r.reason, "no_capability_path")
 
     def test_note_has_markdown_and_html_not_ical(self):

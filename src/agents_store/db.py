@@ -96,7 +96,7 @@ def _migrate_v4(conn: sqlite3.Connection) -> None:
 
 
 def _migrate_v5(conn: sqlite3.Connection) -> None:
-    """Refusal.reason ids: kebab-case -> snake_case. Idempotent one-shot.
+    """WriteRefusal.reason ids: kebab-case -> snake_case. Idempotent one-shot.
 
     The refusal table is append-only at runtime; this migration briefly drops
     the update trigger, rewrites the known reason ids, and restores it.

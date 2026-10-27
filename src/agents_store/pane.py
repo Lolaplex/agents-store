@@ -12,7 +12,7 @@ import sqlite3
 from collections import deque
 from typing import Any
 
-from .contracts import Refusal
+from .contracts import WriteRefusal
 from .mediator import Artifact, mediate
 from .registry import Registry
 from .store import Store
@@ -48,12 +48,12 @@ def targets(conn: sqlite3.Connection, reg: Registry, e: str) -> set[str]:
     return out
 
 
-def render(conn: sqlite3.Connection, reg: Registry, e: str, target: str) -> Artifact | Refusal:
+def render(conn: sqlite3.Connection, reg: Registry, e: str, target: str) -> Artifact | WriteRefusal:
     if target not in targets(conn, reg, e):
-        return Refusal("pane", "no_capability_path", e=e, a=target)
+        return WriteRefusal("pane", "no_capability_path", e=e, a=target)
     art = mediate(conn, reg, e, target)
     if art is None:  # path vanished between targets() and mediate — treat as refusal
-        return Refusal("pane", "no_capability_path", e=e, a=target)
+        return WriteRefusal("pane", "no_capability_path", e=e, a=target)
     return art
 
 

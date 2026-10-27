@@ -24,7 +24,7 @@ from typing import Any, Mapping
 
 MAX_SAFE_INTEGER = 2**53 - 1
 
-# typed refusal reasons (Refusal.reason)
+# typed refusal reasons (WriteRefusal.reason)
 NUMBER_FLOAT = "number_float"                # a finite binary float
 NUMBER_NONFINITE = "number_nonfinite"        # NaN, Infinity, -Infinity
 NUMBER_OUT_OF_RANGE = "number_out_of_range"  # integer beyond ±(2**53 - 1)

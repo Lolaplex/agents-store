@@ -3,7 +3,7 @@ import json
 import unittest
 from dataclasses import dataclass
 
-from agents_store import AttrSpec, Change, PutResult, Refusal, connect
+from agents_store import AttrSpec, Change, PutResult, WriteRefusal, connect
 from agents_store.certify import apply, certify, check_lens, grant_roundtrip
 from agents_store.grant import is_writable
 from agents_store.store import Store

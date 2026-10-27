@@ -22,7 +22,7 @@ import json
 import sqlite3
 from dataclasses import dataclass, field
 
-from .contracts import Change, Refusal
+from .contracts import Change, WriteRefusal
 
 
 def _ref(e: str, a: str) -> str:
@@ -149,7 +149,7 @@ def _rederive(store, m: Mediator, entities: set[str]) -> dict:
             # native or foreign-mediator values are a visible conflict
             if cur_set - src_set and live_mid != m.id:
                 # value present that this mediator did not produce
-                store.record_refusal(Refusal(
+                store.record_refusal(WriteRefusal(
                     wrapper="store", reason="mediator_conflict", e=e, a=a_to,
                     payload=f"mediator {m.id}: {a_to} has non-derived value"))
                 report["conflicts"] += 1

@@ -20,7 +20,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-from ..contracts import Change, Refusal
+from ..contracts import Change, WriteRefusal
 from ..store import Store
 from ..wrappers.markdown import MarkdownWrapper, _ParseFail
 
@@ -31,7 +31,7 @@ class SyncReport:
     created: int = 0
     files_written: int = 0
     tx_count: int = 0
-    refusals: list[Refusal] = field(default_factory=list)
+    refusals: list[WriteRefusal] = field(default_factory=list)
 
 
 def _slug(title: Any, e: str) -> str:
@@ -39,12 +39,12 @@ def _slug(title: Any, e: str) -> str:
     return (s or "untitled") + ".md" if s else f"untitled-{e[:8]}.md"
 
 
-def _refuse(store: Store, wrapper: str, reason: str, e=None, a=None, payload=None) -> Refusal:
+def _refuse(store: Store, wrapper: str, reason: str, e=None, a=None, payload=None) -> WriteRefusal:
     store.conn.execute(
         "INSERT INTO refusal (wrapper, entity, attr, reason, payload) VALUES (?,?,?,?,?)",
         (wrapper, e, a, reason, None if payload is None else str(payload)),
     )
-    return Refusal(wrapper=wrapper, reason=reason, e=e, a=a, payload=None if payload is None else str(payload))
+    return WriteRefusal(wrapper=wrapper, reason=reason, e=e, a=a, payload=None if payload is None else str(payload))
 
 
 def _paths_of(store: Store, e: str) -> set[str]:

@@ -20,7 +20,7 @@ from __future__ import annotations
 import re
 from typing import Any, Mapping
 
-from ..contracts import AttrSpec, Change, PutResult, Refusal
+from ..contracts import AttrSpec, Change, PutResult, WriteRefusal
 
 _STATUS_TO_ICAL = {"open": "NEEDS-ACTION", "done": "COMPLETED"}
 _STATUS_FROM_ICAL = {v: k for k, v in _STATUS_TO_ICAL.items()}
@@ -111,11 +111,11 @@ class ICalWrapper:
         try:
             comp, props, extra = _parse(rep)
         except _ParseFail as f:
-            return PutResult(refusals=(Refusal("ical", "parse_fail", e=e, payload=str(f)),))
+            return PutResult(refusals=(WriteRefusal("ical", "parse_fail", e=e, payload=str(f)),))
         uid = props["UID"][1] if "UID" in props else None
         if e is not None and uid is not None and uid != e:
             return PutResult(refusals=(
-                Refusal("ical", "uid_mismatch", e=e, payload=f"UID {uid} != {e}"),))
+                WriteRefusal("ical", "uid_mismatch", e=e, payload=f"UID {uid} != {e}"),))
         te = e or uid
         # timezone law: only Z times
         for name in ("DTSTART", "DTEND", "DUE"):
@@ -123,10 +123,10 @@ class ICalWrapper:
                 pname, pval = props[name]
                 if "TZID" in pname or not pval.strip().endswith("Z"):
                     return PutResult(refusals=(
-                        Refusal("ical", "tz_unsupported", e=te, a="when", payload=pval),))
+                        WriteRefusal("ical", "tz_unsupported", e=te, a="when", payload=pval),))
         if "STATUS" in props and props["STATUS"][1] not in _STATUS_FROM_ICAL:
             return PutResult(refusals=(
-                Refusal("ical", "status_map", e=te, a="status", payload=props["STATUS"][1]),))
+                WriteRefusal("ical", "status_map", e=te, a="status", payload=props["STATUS"][1]),))
 
         v = view or {}
         changes: list[Change] = []
