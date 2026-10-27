@@ -45,7 +45,7 @@ def _toy_violation(**kw):
         domain="example.domain",
         severity="refusal",
         source="docs/example.md#checks",
-        test="An example condition fails.",
+        when="An example condition fails.",
     )
     base.update(kw)
     return DomainViolationId(**base)

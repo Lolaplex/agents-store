@@ -118,13 +118,13 @@ class DomainViolationId:
       domain: owning domain (for example "agents-design.template-engine").
       severity: "refusal" (blocks) or "diagnostic" (loud, recorded, does not block).
       source: provenance reference (doc path, pin, URL, or SAID).
-      test: when it fires; English user-facing text, ASD-STE100.
+      when: English text that says when the id fires (ASD-STE100).
     """
     id: str
     domain: str
     severity: ViolationSeverity
     source: str
-    test: str = ""
+    when: str = ""
 
 
 @dataclass(frozen=True)

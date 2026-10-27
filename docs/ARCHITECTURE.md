@@ -107,7 +107,7 @@ Shape (`contracts.DomainViolationId`):
 | `domain` | Owning domain (for example `agents-design.template-engine`). |
 | `severity` | `refusal` (blocks) or `diagnostic` (loud, recorded, does not block). |
 | `source` | Provenance reference (doc path, pin, URL, or SAID). |
-| `test` | When it fires. English user-facing text follows ASD-STE100. |
+| `when` | English text that says when the id fires (ASD-STE100). |
 
 The owning domain registers the id (entry point or in-process). This package
 does not hard-code domain ids and leaves the entry-point group empty — the
