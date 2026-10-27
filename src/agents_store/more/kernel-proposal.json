@@ -259,7 +259,7 @@
             "relayed_via": "klanker"
           }
         },
-        "purpose": "no MORe source names a purpose for manuals (searched: MP C.1, BEL §5, IA §6 and §14.3, US §8, ELSTER §6). purpose_register.profiles.agents_design registers manual as a profile addition with typed provenance, pending Fabian's approval (more-lean-model.md §12d)."
+        "purpose": "no MORe source names a purpose for manuals (searched: MP C.1, BEL §5, IA §6 and §14.3, US §8, ELSTER §6). purpose_register.profiles.agents_design registers manual as a profile addition with typed provenance, approved by Fabian on 2026-10-27 (approval.status approved; more-lean-model.md §12d)."
       },
       "src": "BEL v1.2 §7.2 ('Sichten, Ableitungen, Umsetzung, Nachweise ...'), §5.2.1, §10.2; MP p.6, p.6-7 (B.2); ELSTER §1, §6, §10 Phase D, §11.2; ruling C21 (Fabian, 2026-10-27)",
       "modes": {
@@ -1119,7 +1119,8 @@
             "author_pointer_invalid",
             "author_lineage_invalid",
             "board_dependency_cycle",
-            "author_node_invalid"
+            "author_node_invalid",
+            "board_evidence_source_invalid"
           ],
           "v1_map": {
             "create": "registerIssue",
@@ -1135,7 +1136,30 @@
             "comment": "comment"
           },
           "note": "Workflow status is derived (More/Jwf); kernel events use submitKernel. Board-only verbs are §12b additions with provenance in board-author-verdicts.json — do not cite metamodel-kernel.json or SQLite columns as MORe sources. Do not map board depends gate to dor_dependency_unresolved or schedule rules to envelope_invalid. A depends_on cycle is board_dependency_cycle (§12b board-added refusal on the sourced assertPointer), not author_pointer_invalid.",
-          "v1_create_dispatch": "create of a kind in kind_map with kernel_kind hierarchy_node also emits registerNode (More/BoardProjection.lean boardCreate); v1_map stays registerIssue"
+          "v1_create_dispatch": "create of a kind in kind_map with kernel_kind hierarchy_node also emits registerNode (More/BoardProjection.lean boardCreate); v1_map stays registerIssue",
+          "kind_terms": {
+            "task": "user story (implementation element)",
+            "cutover_step": "cut-over step (implementation element)",
+            "requirement": "requirement",
+            "decision": "decision",
+            "test": "test case",
+            "challenge": "challenge (board item)",
+            "gap": "gap (signal)",
+            "domain": "domain (Fachgebiet)",
+            "use_case": "use case (Anwendungsfall)",
+            "business_process": "business process (BP)",
+            "conceptual_model": "conceptual model (CM)",
+            "acceptance_criterion": "acceptance criterion (AC)",
+            "ui_spec": "user interface (UI)",
+            "api_spec": "interface (API)"
+          },
+          "kind_terms_note": "One shared vocabulary: the board kind strings stay (storage and API keys); the board shows the MORe term. Lean More/BoardProjection.lean boardKindTerm. Sources: US whitepaper §1 and §6 (a user story is an implementation element), kind_map, LEI hierarchy.",
+          "evidence_source_kinds": [
+            "use_case",
+            "acceptance_criterion",
+            "requirement"
+          ],
+          "evidence_direction": "from the item it proves (use case, acceptance criterion, requirement) to the test case or evidence item; kernel direction (Examples.lean verifPtr REQ-1 -> TC-1)"
         },
         "world_model_projection": {
           "lean": "More/WorldModel.lean",
@@ -1161,7 +1185,16 @@
               "Produktion": "done"
             },
             "phases_source": "JWF p.7",
-            "canceled": "never derived"
+            "canceled": "never derived",
+            "by_kind": {
+              "lean": "More/BoardProjection.lean issueColumn",
+              "provenance": "board_addition (more-lean-model.md §12b); the roles have sources (more-lean-model.md §12 'Board column by kind')",
+              "use_case": "boardColumn of its own JWF state",
+              "part": "the column of its use case (business_process, conceptual_model, acceptance_criterion, ui_spec, api_spec)",
+              "implementation": "task, cutover_step: the later of the derived status and, per implements pointer from a use case at JWF level 5 or more, todo / in_progress (live event about it) / done (claim met)",
+              "other": "requirement, test, decision, challenge, gap: derived status (no event backlog, live event todo, done done)",
+              "domain": "unsourced board addition: all use cases done → done; one past todo → in_progress; one in todo → todo; else backlog; no use case → derived status"
+            }
           }
         },
         "views": [
@@ -1549,7 +1582,7 @@
     },
     "profiles": {
       "agents_design": {
-        "note": "agents-design's merged purpose list (calculus §8.2) is render, interaction, accessibility, theming, docs, acceptance, operations, with verification to be added (ruling C21). acceptance, operations and verification are sourced. Ruling C21 Q6 drops docs: prose specs are sources and generated documentation is a projection (core_primitives.derivative.documentation_split). Manuals are derivatives, and their purpose is the entry manual. The entries are render, interaction, accessibility, theming and manual; all are pending Fabian's approval (approval.status).",
+        "note": "The entries are render, interaction, accessibility, theming and manual. All five are profile additions, approved by Fabian on 2026-10-27 (approval.status). agents-design's acceptance, operations and (per ruling C21) verification are the sourced purposes, not entries. Ruling C21 Q6 dropped agents-design's docs purpose: prose specs are sources and generated documentation is a projection (core_primitives.derivative.documentation_split). Manuals are derivatives, and their purpose is the entry manual (more-lean-model.md §12d).",
         "entries": [
           {"key": "render", "invariants": ["element_tree", "resolved_token_values"], "provenance": {"kind": "profile_addition", "profile": "agents-design", "src": "Lolaplex/agents-design PR #4 docs/2026-10-27-calculus.md §8.2 @36495f9", "ruling": "C14, C21 (Fabian, 2026-10-27)"}, "approval": {"status": "approved", "by": "Fabian Schindler", "date": "2026-10-27", "note": "invariant names chosen by us, approved by Fabian (t218u)"}},
           {"key": "interaction", "invariants": ["client_transitions"], "provenance": {"kind": "profile_addition", "profile": "agents-design", "src": "Lolaplex/agents-design PR #4 docs/2026-10-27-calculus.md §8.2 @36495f9", "ruling": "C14, C21 (Fabian, 2026-10-27)"}, "approval": {"status": "approved", "by": "Fabian Schindler", "date": "2026-10-27", "note": "invariant names chosen by us, approved by Fabian (t218u)"}},
