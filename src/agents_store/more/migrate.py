@@ -21,6 +21,14 @@ asserts more:said, computed from the stored envelope and the event name, on
 every event entity that has none, in one 'evolve' tx. An existing more:said
 that differs from the recomputed SAID is not overwritten: the migration
 raises SaidMismatch (a name is never rebound to other content). Idempotent.
+
+Numbers (C4): events stored before the number guard can hold binary floats,
+NaN/Infinity or integers beyond ±(2**53 - 1). number_report() lists them.
+migrate_said never rewrites such an event (the log is append-only; a fix is
+a new event that supersedes it, with the number as {value, scale}). It
+asserts no new more:said for it, because a SAID over a non-canonical number
+is not reproducible across implementations, and leaves an existing one as
+it is. Pass `report=[]` to collect the findings.
 """
 from __future__ import annotations
 
@@ -32,6 +40,7 @@ from agents_store.grant import INTERNAL_WRAPPER
 from agents_store.store import Store
 
 from .events import Event
+from .numbers import NumberIssue, number_issues
 from .said import event_said
 from .store_bridge import pinned_changes, subject_changes
 
@@ -142,15 +151,34 @@ def _said_vocabulary(conn: sqlite3.Connection) -> None:
                          (json.dumps(opt + ["more:said"]), kind))
 
 
-def planned_said_changes(store: Store) -> list[Change]:
+def number_report(conn: sqlite3.Connection) -> list[tuple[str, NumberIssue]]:
+    """(event id, issue) for every stored event with a non-canonical number,
+    in log order. Read-only."""
+    if not _has_table(conn, "event"):
+        return []
+    out: list[tuple[str, NumberIssue]] = []
+    for eid, envelope in conn.execute("SELECT id, envelope FROM event ORDER BY seq"):
+        out += [(eid, i) for i in number_issues(json.loads(envelope))]
+    return out
+
+
+def planned_said_changes(store: Store,
+                         report: list[tuple[str, NumberIssue]] | None = None) -> list[Change]:
     """more:said for every materialized event that has none. Raises
-    SaidMismatch when a stored SAID does not match its envelope."""
+    SaidMismatch when a stored SAID does not match its envelope. Events with
+    a non-canonical number are skipped and added to `report`."""
     out: list[Change] = []
     rows = store.conn.execute(
         "SELECT e.id, e.envelope FROM event e JOIN entity n ON n.id = e.id ORDER BY e.seq"
     ).fetchall()
     for eid, envelope in rows:
-        want = event_said(Event.from_envelope(json.loads(envelope)), eid)
+        env = json.loads(envelope)
+        issues = number_issues(env)
+        if issues:
+            if report is not None:
+                report += [(eid, i) for i in issues]
+            continue
+        want = event_said(Event.from_envelope(env), eid)
         have = store.view(eid).get("more:said")
         if have is None:
             out.append(Change(eid, "more:said", want))
@@ -159,9 +187,11 @@ def planned_said_changes(store: Store) -> list[Change]:
     return out
 
 
-def migrate_said(conn: sqlite3.Connection) -> int | None:
+def migrate_said(conn: sqlite3.Connection,
+                 report: list[tuple[str, NumberIssue]] | None = None) -> int | None:
     """Run the v4 vocabulary change and SAID backfill. Returns the backfill
-    tx id, or None when nothing had to change."""
+    tx id, or None when nothing had to change. Events with a non-canonical
+    number are not rewritten and get no new SAID; they go to `report`."""
     if not (_has_table(conn, "entity") and _has_table(conn, "event")):
         return None
     own = not conn.in_transaction
@@ -170,7 +200,7 @@ def migrate_said(conn: sqlite3.Connection) -> int | None:
     try:
         _said_vocabulary(conn)
         store = Store(conn)
-        changes = planned_said_changes(store)
+        changes = planned_said_changes(store, report)
         tx = None
         if changes:
             result = store.transact(changes, wrapper=INTERNAL_WRAPPER, op="evolve", note=NOTE_SAID)

@@ -71,9 +71,12 @@ class Event:
             d[k] = list(d[k])
         return d
 
-    def canonical(self) -> bytes:
+    def canonical(self, *, allow_nan: bool = False) -> bytes:
+        """Envelope bytes for the hash chain. NaN and ±Infinity raise
+        ValueError; `allow_nan=True` is only for re-reading envelopes stored
+        before the number guard (EventLog.verify)."""
         return json.dumps(self.envelope(), sort_keys=True, separators=(",", ":"),
-                          ensure_ascii=False).encode("utf-8")
+                          ensure_ascii=False, allow_nan=allow_nan).encode("utf-8")
 
     @classmethod
     def from_envelope(cls, d: Mapping[str, Any], **assigned: Any) -> "Event":

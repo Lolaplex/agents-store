@@ -141,10 +141,38 @@ order, as with `sort_keys=True`). The reasons: keripy's
 `Saider.saidify`/`verify` reproduce our SAIDs unchanged, which JCS's
 lexicographic top-level order and ES6 number formatting would not. It also
 matches KERI/ACDC practice, where the field order is part of the schema.
-Floats are serialized by Python's `json`; prefer integers or strings in event
-bodies when you need cross-implementation SAIDs.
+`allow_nan=False` is set in `said.dumps` and in `Event.canonical`, so NaN and
+±Infinity never reach a digest.
 
-**Test vectors** (`tests/more/test_said.py`):
+**Numbers: integers with a declared scale (C4, ruled 2026-10-27).** A number
+in an event is a JSON integer with |n| ≤ 2^53 − 1 (the I-JSON safe range,
+RFC 7493 §2.2). A non-integer quantity is an object `{"value": <int>,
+"scale": <int>}` that means value × 10^−scale. For example, 0.80 is
+`{"value": 80, "scale": 2}` and 0.8 is `{"value": 8, "scale": 1}`, so the
+declared scale is kept. `numbers.scaled("0.80")` builds it from the decimal
+text and `numbers.unscaled` reads it back. Binary floats are not allowed, and
+neither are decimal strings or floats under JCS (both were rejected). The
+reason is that Python writes a float as its shortest repr (`1e-07`,
+`0.30000000000000004`, `-0.0`) and NaN as the non-JSON token `NaN`, and other
+implementations write the same value differently, so the SAID would differ.
+
+- **Append guard.** Before anything is hashed or written, `EventLog.append`
+  calls `store_bridge.assert_canonical_numbers`. It raises `StoreWriteRefused`
+  with one `Refusal` per bad number. `reason` is one of `number_float`,
+  `number_nonfinite` and `number_out_of_range`, `a` is the envelope field and
+  `payload` is the JSON path (e.g. `$.body.amount`). The refusal is also
+  recorded in `more_refusal`. `bool` is a JSON literal and passes.
+- **Events stored before the guard** are never rewritten (the log is
+  append-only). `migrate.number_report(conn)` lists them. `migrate_said(conn,
+  report=[])` skips them, so they get no new `more:said`, leaves an existing
+  SAID as it is, and adds them to `report`. The fix is a new event that
+  supersedes the old one and carries the number as `{value, scale}`.
+  `EventLog.verify` re-reads such envelopes with `allow_nan=True`, so they do
+  not show as `event_mutated`. A read of a stored NaN event gives `said=None`.
+
+Tests: `tests/more/test_numbers.py`.
+
+**Test vectors** (`tests/more/test_said.py`, unchanged by the number guard):
 
 - BLAKE3 reference digests for `""` and `"abc"`;
 - keripy `test_diger`: `Diger(ser=b"abc…789")` gives
