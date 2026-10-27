@@ -15,6 +15,15 @@ Upstream layout at that revision:
 | `src/agents_store/more/kernel-proposal.json` | `lean-model/kernel-proposal.json` |
 | `tests/more/` | `companion/python/tests/` (+ store integration tests) |
 
+**Board kinds (partial re-vendor).** `projections.lolaplex-board.board_only_config`
+`kind_map`, `kind_map_hierarchy`, `relation_map` and `relation_map_sources`
+match `Cypoe/more-framework@c56f457` (merge of PR #7, head `db55d43`): the hierarchy
+kinds `domain`, `use_case`, `business_process`, `conceptual_model`, `ui_spec`,
+`api_spec`, `acceptance_criterion` and the `implements` relation (BEL §7.2,
+ELSTER §6). The author calculus (`registerNode`) and the board projection
+(`More/BoardProjection.lean`) are not vendored here; the board ports them.
+Store entity kinds in `seed.sql` are unrelated and unchanged.
+
 Porting contract and Lean reference:
 `Cypoe/more-framework@e32e5c3:kernel/More/PORTING.md` (do not restate kernel
 semantics here). Normative prose:

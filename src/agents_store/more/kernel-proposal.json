@@ -784,14 +784,96 @@
           "requirement": "requirement",
           "decision": "decision",
           "test": "test_case",
-          "cutover_step": "board subtype of implementation"
+          "cutover_step": "board subtype of implementation",
+          "domain": "hierarchy_node Fachgebiet",
+          "use_case": "hierarchy_node Anwendungsfall",
+          "business_process": "hierarchy_node BP",
+          "conceptual_model": "hierarchy_node CM",
+          "acceptance_criterion": "hierarchy_node AC",
+          "ui_spec": "hierarchy_node UI",
+          "api_spec": "hierarchy_node API"
         },
+        "kind_map_hierarchy": {
+          "domain": {
+            "level": "Fachgebiet",
+            "level_source": [
+              "LEI (Practitioner Training): 'die Hierarchie von Fachgebiet über Anwendungsfall bis zu BP, CM, UI, API, TC, AC und DEC'",
+              "proposed from IA v1.4 §8 p.11 (IA §9 table has no Fachgebiet row; hierarchy.questions.Fachgebiet)"
+            ],
+            "kind_name": "board_addition (the board's string for the level)"
+          },
+          "use_case": {
+            "level": "Anwendungsfall",
+            "level_source": [
+              "LEI (Practitioner Training): 'die Hierarchie von Fachgebiet über Anwendungsfall bis zu BP, CM, UI, API, TC, AC und DEC'",
+              "IA v1.4 §9 p.12 (table 'Die eine Frage'): 'Was will der Nutzer erreichen?'"
+            ],
+            "kind_name": "board_addition (the board's string for the level)",
+            "jwf_condition": "the JWF subject (More/Jwf.lean jwfChain r)"
+          },
+          "business_process": {
+            "level": "BP",
+            "level_source": [
+              "LEI (Practitioner Training): 'die Hierarchie von Fachgebiet über Anwendungsfall bis zu BP, CM, UI, API, TC, AC und DEC'",
+              "IA v1.4 §9 p.12 (table 'Die eine Frage'): 'Wie läuft es fachlich ab?'"
+            ],
+            "kind_name": "board_addition (the board's string for the level)",
+            "jwf_condition": "2 In fachlicher Beschreibung"
+          },
+          "conceptual_model": {
+            "level": "CM",
+            "level_source": [
+              "LEI (Practitioner Training): 'die Hierarchie von Fachgebiet über Anwendungsfall bis zu BP, CM, UI, API, TC, AC und DEC'",
+              "IA v1.4 §9 p.12 (table 'Die eine Frage'): 'Mit welchen Begriffen und Daten wird gearbeitet?'"
+            ],
+            "kind_name": "board_addition (the board's string for the level)",
+            "jwf_condition": "2 In fachlicher Beschreibung"
+          },
+          "acceptance_criterion": {
+            "level": "AC",
+            "level_source": [
+              "LEI (Practitioner Training): 'die Hierarchie von Fachgebiet über Anwendungsfall bis zu BP, CM, UI, API, TC, AC und DEC'",
+              "IA v1.4 §9 p.12 (table 'Die eine Frage'): 'Wann ist die Anforderung fachlich erfüllt?'"
+            ],
+            "kind_name": "board_addition (the board's string for the level)",
+            "jwf_condition": "2 In fachlicher Beschreibung; DoR acClear"
+          },
+          "ui_spec": {
+            "level": "UI",
+            "level_source": [
+              "LEI (Practitioner Training): 'die Hierarchie von Fachgebiet über Anwendungsfall bis zu BP, CM, UI, API, TC, AC und DEC'",
+              "IA v1.4 §9 p.12 (table 'Die eine Frage'): 'Wie interagiert der Nutzer mit dem System?'"
+            ],
+            "kind_name": "board_addition (the board's string for the level)",
+            "jwf_condition": "3 In technischer Beschreibung"
+          },
+          "api_spec": {
+            "level": "API",
+            "level_source": [
+              "LEI (Practitioner Training): 'die Hierarchie von Fachgebiet über Anwendungsfall bis zu BP, CM, UI, API, TC, AC und DEC'",
+              "IA v1.4 §9 p.12 (table 'Die eine Frage'): 'Wie kommunizieren die Systeme?'"
+            ],
+            "kind_name": "board_addition (the board's string for the level)",
+            "jwf_condition": "3 In technischer Beschreibung"
+          }
+        },
+        "kind_map_hierarchy_note": "Hierarchy kinds (domain..api_spec) are created by v1 create = registerIssue (board row, §12b) + registerNode (sourced; refusal author_node_invalid when the parent rule fails or the id exists). Levels and parent rule are sourced (LEI hierarchy; IA v1.4 §9 p.12; hierarchy.parent). Which levels feed JWF conditions 2 (BP/CM/AC) and 3 (UI/API) is the kernel mapping of More/Jwf.lean (Cypoe/more-framework@c56f457:lean-model/more-lean-model.md §12: 'The mapping is ours'), not source text. task/requirement/decision/test/cutover_step are unchanged; test and decision stay events/pointers, not TC/DEC nodes. Lean: Cypoe/more-framework@c56f457:kernel/More/BoardProjection.lean boardKindLevel; author calculus and examples live there (not vendored here).",
         "relation_map": {
           "depends": "depends_on",
           "refines": "refines",
           "references": "references",
           "evidences": "verifies",
+          "implements": "implements",
           "follow": "board-only"
+        },
+        "relation_map_sources": {
+          "implements": {
+            "source": "BEL §7.2, ELSTER §6",
+            "de": "setzt um",
+            "preserves_required": true,
+            "jwf_conditions": "5 Fertig für Entwicklung (pointer exists), 6 In Entwicklung (live event about the target), 7 In technischer QS (event pinned to both ends), 8 Fertig zum Testen (claimMet)",
+            "refusal": "author_pointer_invalid when preserves is empty"
+          }
         },
         "verbs": "unchanged from v1 (caps)",
         "views": [
