@@ -44,8 +44,8 @@ def _toy_violation(**kw):
         id="example_domain_check",
         domain="example.domain",
         severity="refusal",
-        source="docs/example.md#checks",
-        when="An example condition fails.",
+        provenance_ref="docs/example.md#checks",
+        fires_when="An example condition fails.",
     )
     base.update(kw)
     return DomainViolationId(**base)
@@ -95,11 +95,11 @@ class TestDomainViolationIds(unittest.TestCase):
         self.assertIs(reg.violation_id("example_domain_check"), v)
         self.assertIs(reg.violation_ids["example_domain_check"], v)
 
-    def test_diagnostic_severity_accepted(self):
+    def test_warning_severity_accepted(self):
         reg = Registry()
-        v = _toy_violation(id="example_loud_warn", severity="diagnostic")
+        v = _toy_violation(id="example_loud_warn", severity="warning")
         reg.register_violation_id(v)
-        self.assertEqual(reg.violation_id("example_loud_warn").severity, "diagnostic")
+        self.assertEqual(reg.violation_id("example_loud_warn").severity, "warning")
 
     def test_duplicate_id_refused(self):
         reg = Registry()
@@ -121,17 +121,17 @@ class TestDomainViolationIds(unittest.TestCase):
     def test_bad_severity_refused(self):
         reg = Registry()
         with self.assertRaises(RegistryError):
-            reg.register_violation_id(_toy_violation(severity="warning"))
+            reg.register_violation_id(_toy_violation(severity="diagnostic"))
 
     def test_missing_domain_refused(self):
         reg = Registry()
         with self.assertRaises(RegistryError):
             reg.register_violation_id(_toy_violation(domain=""))
 
-    def test_missing_source_refused(self):
+    def test_missing_provenance_ref_refused(self):
         reg = Registry()
         with self.assertRaises(RegistryError):
-            reg.register_violation_id(_toy_violation(source=""))
+            reg.register_violation_id(_toy_violation(provenance_ref=""))
 
     def test_non_dataclass_refused(self):
         reg = Registry()
