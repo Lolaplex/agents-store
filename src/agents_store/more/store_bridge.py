@@ -2,9 +2,15 @@
 
 All datom writes go through Store.transact (the store's only write API), in
 one tx per event: the entity row, the more:* datoms, the ADR projection for
-decisions and the more:pin version pin all land under that tx. Lineage edges
-are not datoms; they are appended under the same tx via lineage.record_edge.
-The caller (EventLog.append) owns the surrounding SQLite transaction, so the
+decisions and the more:pin version pin all land under that tx.
+
+Queryable references (see docs/more/README.md, "Queryable subjects and pins"):
+more:subject is a ref to a subject that is a store entity, more:subject_ptr
+keeps every other subject as a pointer target id, and more:pinned_against
+holds the envelope's pins verbatim.
+
+Lineage edges are not datoms; they are appended under the same tx via
+lineage.record_edge. The caller (EventLog.append) owns the surrounding SQLite transaction, so the
 event row, its datoms and its edges commit or roll back together.
 """
 from __future__ import annotations
@@ -36,8 +42,28 @@ def _store_backed(conn: sqlite3.Connection) -> bool:
     return row is not None
 
 
-def event_changes(event: Event) -> list[Change]:
-    """The datoms of one event, all on the entity this tx creates (e=None)."""
+def subject_changes(store: Store, event: Event, e: str | None = None) -> list[Change]:
+    """Subjects as queryable datoms. A subject that is a store entity becomes
+    a ref (more:subject); any other subject stays a pointer target id
+    (more:subject_ptr). No stub entity is minted for an external artifact:
+    the kernel holds a pointer to it, never a copy (core_primitives.artifact,
+    core_primitives.pointer)."""
+    out: list[Change] = []
+    for s in dict.fromkeys(event.subjects):
+        a = "more:subject" if store.exists(s) else "more:subject_ptr"
+        out.append(Change(e, a, s))
+    return out
+
+
+def pinned_changes(event: Event, e: str | None = None) -> list[Change]:
+    """pinned_against as datoms, verbatim (artifact@version, commit or
+    baseline; same target@version shape as more:pin)."""
+    return [Change(e, "more:pinned_against", p) for p in dict.fromkeys(event.pinned_against)]
+
+
+def event_changes(event: Event, store: Store | None = None) -> list[Change]:
+    """The datoms of one event, all on the entity this tx creates (e=None).
+    Without a store every subject is treated as a pointer (more:subject_ptr)."""
     body = dict(event.body or {})
     changes = [
         Change(None, "more:type", event.type),
@@ -45,7 +71,11 @@ def event_changes(event: Event) -> list[Change]:
         Change(None, "more:at", event.at),
         Change(None, "more:body", body),
     ]
-    changes += [Change(None, "more:subject", s) for s in dict.fromkeys(event.subjects)]
+    if store is not None:
+        changes += subject_changes(store, event)
+    else:
+        changes += [Change(None, "more:subject_ptr", s) for s in dict.fromkeys(event.subjects)]
+    changes += pinned_changes(event)
     if event.type == "decision":
         changes += _adr_changes(body)
     return changes
@@ -71,7 +101,7 @@ def materialize_entity(store: Store, eid: str, event: Event) -> int:
     """Write the entity and datoms for one admitted event (entity id = event
     id) in one transact call. Returns the tx id."""
     result = store.transact(
-        event_changes(event),
+        event_changes(event, store),
         wrapper=INTERNAL_WRAPPER,
         agent=event.actor,
         op="assert",

@@ -5,7 +5,7 @@ import sqlite3
 from importlib import resources
 from pathlib import Path
 
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 
 _HISTORY_TABLES = (
     "tx", "lineage", "certificate", "grant_", "refusal", "provenance",
@@ -25,7 +25,7 @@ def _table_sql(conn: sqlite3.Connection, name: str) -> str | None:
 
 def _migrate_v2(conn: sqlite3.Connection) -> None:
     ver = conn.execute("PRAGMA user_version").fetchone()[0]
-    if ver >= SCHEMA_VERSION:
+    if ver >= 2:
         return
 
     cols = {r[1] for r in conn.execute("PRAGMA table_info(certificate)")}
@@ -71,7 +71,17 @@ def _migrate_v2(conn: sqlite3.Connection) -> None:
             PRAGMA foreign_keys=ON;
         """)
 
-    conn.execute(f"PRAGMA user_version = {SCHEMA_VERSION}")
+    conn.execute("PRAGMA user_version = 2")
+
+
+def _migrate_v3(conn: sqlite3.Connection) -> None:
+    """Queryable MORe references: more:subject as ref, more:subject_ptr,
+    more:pinned_against; backfilled from the event envelopes."""
+    if conn.execute("PRAGMA user_version").fetchone()[0] >= 3:
+        return
+    from .more.migrate import migrate_queryable_refs
+    migrate_queryable_refs(conn)
+    conn.execute("PRAGMA user_version = 3")
 
 
 def connect(path: str | Path = ":memory:") -> sqlite3.Connection:
@@ -86,6 +96,7 @@ def connect(path: str | Path = ":memory:") -> sqlite3.Connection:
         resources.files("agents_store.more").joinpath("schema.sql").read_text(encoding="utf-8")
     )
     _migrate_v2(conn)
+    _migrate_v3(conn)
     if conn.execute("PRAGMA user_version").fetchone()[0] < SCHEMA_VERSION:
         conn.execute(f"PRAGMA user_version = {SCHEMA_VERSION}")
     return conn

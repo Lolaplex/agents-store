@@ -11,3 +11,4 @@
   ```
   → `Ran 114 tests in 0.304s` / `OK`
 - limits: No CLI/MCP surface (T18); subjects in MORe are still string ids, not necessarily store entities.
+  (Later: schema v3 makes subjects and pins queryable: `more:subject` ref, `more:subject_ptr`, `more:pinned_against`; see `docs/more/README.md`.)

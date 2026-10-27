@@ -221,6 +221,24 @@ class Store:
     def exists(self, e: str) -> bool:
         return self._exists(e)
 
+    def find(self, a: str, v: Any = None, *, prefix: str | None = None) -> list[str]:
+        """Entities whose current value of `a` equals `v` (or, with `prefix=`,
+        starts with that text), in creation order. Uses the (a, v) index."""
+        spec = self._spec(a)
+        if spec is None:
+            raise ValueError(f"find: unknown attr {a!r}")
+        if prefix is None:
+            where, params = "c.v = ?", [_encode(spec[0], v)]
+        else:
+            # index-friendly range instead of LIKE (no wildcard escaping)
+            where, params = "c.v >= ? AND c.v < ?", [prefix, prefix + "\U0010ffff"]
+        rows = self.conn.execute(
+            f"""SELECT DISTINCT c.e FROM v_current c JOIN entity n ON n.id = c.e
+                WHERE c.a = ? AND {where} ORDER BY n.created_tx, c.e""",
+            [a, *params],
+        ).fetchall()
+        return [r[0] for r in rows]
+
     # ---- internals ----------------------------------------------------
 
     def _exists(self, e: str) -> bool:
