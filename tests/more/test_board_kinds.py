@@ -1,5 +1,5 @@
 """Board hierarchy kinds and the implements relation in the vendored
-kernel-proposal.json (mirror of Cypoe/more-framework@db55d43,
+kernel-proposal.json (mirror of Cypoe/more-framework@c56f457,
 kernel/More/BoardProjection.lean boardKindLevel / boardRelType)."""
 import json
 import unittest

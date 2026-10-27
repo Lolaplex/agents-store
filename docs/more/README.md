@@ -17,7 +17,7 @@ Upstream layout at that revision:
 
 **Board kinds (partial re-vendor).** `projections.lolaplex-board.board_only_config`
 `kind_map`, `kind_map_hierarchy`, `relation_map` and `relation_map_sources`
-match `Cypoe/more-framework@db55d43` (PR #7, not yet merged): the hierarchy
+match `Cypoe/more-framework@c56f457` (merge of PR #7, head `db55d43`): the hierarchy
 kinds `domain`, `use_case`, `business_process`, `conceptual_model`, `ui_spec`,
 `api_spec`, `acceptance_criterion` and the `implements` relation (BEL §7.2,
 ELSTER §6). The author calculus (`registerNode`) and the board projection

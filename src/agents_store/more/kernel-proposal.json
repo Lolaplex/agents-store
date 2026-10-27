@@ -857,7 +857,7 @@
             "jwf_condition": "3 In technischer Beschreibung"
           }
         },
-        "kind_map_hierarchy_note": "Hierarchy kinds (domain..api_spec) are created by v1 create = registerIssue (board row, §12b) + registerNode (sourced; refusal author_node_invalid when the parent rule fails or the id exists). Levels and parent rule are sourced (LEI hierarchy; IA v1.4 §9 p.12; hierarchy.parent). Which levels feed JWF conditions 2 (BP/CM/AC) and 3 (UI/API) is the kernel mapping of More/Jwf.lean (Cypoe/more-framework@db55d43:lean-model/more-lean-model.md §12: 'The mapping is ours'), not source text. task/requirement/decision/test/cutover_step are unchanged; test and decision stay events/pointers, not TC/DEC nodes. Lean: Cypoe/more-framework@db55d43:kernel/More/BoardProjection.lean boardKindLevel; author calculus and examples live there (not vendored here).",
+        "kind_map_hierarchy_note": "Hierarchy kinds (domain..api_spec) are created by v1 create = registerIssue (board row, §12b) + registerNode (sourced; refusal author_node_invalid when the parent rule fails or the id exists). Levels and parent rule are sourced (LEI hierarchy; IA v1.4 §9 p.12; hierarchy.parent). Which levels feed JWF conditions 2 (BP/CM/AC) and 3 (UI/API) is the kernel mapping of More/Jwf.lean (Cypoe/more-framework@c56f457:lean-model/more-lean-model.md §12: 'The mapping is ours'), not source text. task/requirement/decision/test/cutover_step are unchanged; test and decision stay events/pointers, not TC/DEC nodes. Lean: Cypoe/more-framework@c56f457:kernel/More/BoardProjection.lean boardKindLevel; author calculus and examples live there (not vendored here).",
         "relation_map": {
           "depends": "depends_on",
           "refines": "refines",
