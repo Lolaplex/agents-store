@@ -53,21 +53,21 @@ class TestPut(unittest.TestCase):
         rep = W.get("E1", {"when": "2026-10-12T10:00:00Z"})
         local = rep.replace("DTSTART:20261012T100000Z", "DTSTART;TZID=Europe/Berlin:20261012T100000")
         res = W.put(local, "E1", None)
-        self.assertEqual(res.refusals[0].reason, "tz-unsupported")
+        self.assertEqual(res.refusals[0].reason, "tz_unsupported")
         self.assertEqual(res.changes, ())
 
     def test_status_map_refused(self):
         rep = W.get("E1", {"status": "open"})
         res = W.put(rep.replace("NEEDS-ACTION", "IN-PROCESS"), "E1", None)
-        self.assertEqual(res.refusals[0].reason, "status-map")
+        self.assertEqual(res.refusals[0].reason, "status_map")
 
     def test_parse_fail_garbage(self):
         res = W.put("not an ics at all", "E1", None)
-        self.assertEqual(res.refusals[0].reason, "parse-fail")
+        self.assertEqual(res.refusals[0].reason, "parse_fail")
 
     def test_uid_mismatch_refused(self):
         res = W.put(W.get("E1", {"when": "2026-10-12T10:00:00Z"}), "E2", None)
-        self.assertEqual(res.refusals[0].reason, "uid-mismatch")
+        self.assertEqual(res.refusals[0].reason, "uid_mismatch")
 
     def test_unmapped_props_to_extra(self):
         rep = W.get("E1", {"when": "2026-10-12T10:00:00Z"})

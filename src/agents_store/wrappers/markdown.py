@@ -13,8 +13,8 @@ Format contract:
 
 Rules:
 - a file with no `id` proposes e=None (new entity);
-- `id` present but != the caller's e -> refusal 'id-mismatch';
-- frontmatter must be `key: value` lines inside --- fences; else 'parse-fail';
+- `id` present but != the caller's e -> refusal 'id_mismatch';
+- frontmatter must be `key: value` lines inside --- fences; else 'parse_fail';
 - `md:path` is owned by the folder adapter, never emitted/parsed here.
 """
 from __future__ import annotations
@@ -68,11 +68,11 @@ class MarkdownWrapper:
         try:
             fm, body = _parse(rep)
         except _ParseFail as f:
-            return PutResult(refusals=(Refusal("md", "parse-fail", e=e, payload=str(f)),))
+            return PutResult(refusals=(Refusal("md", "parse_fail", e=e, payload=str(f)),))
         fid = fm.get("id")
         if e is not None and fid is not None and fid != e:
             return PutResult(refusals=(
-                Refusal("md", "id-mismatch", e=e, payload=f"file id {fid} != {e}"),))
+                Refusal("md", "id_mismatch", e=e, payload=f"file id {fid} != {e}"),))
         te = e or fid
         v = view or {}
         changes: list[Change] = []

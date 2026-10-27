@@ -226,7 +226,7 @@ class PluginTest(unittest.TestCase):
         self.assertTrue(status.startswith("400"), status)
         rows = self.conn.execute(
             "SELECT reason FROM refusal WHERE wrapper = 'ical'").fetchall()
-        self.assertIn(("tz-unsupported",), rows)
+        self.assertIn(("tz_unsupported",), rows)
 
     def test_put_to_unknown_collection_conflicts(self):
         status, _, _ = _request(
@@ -312,11 +312,11 @@ class PluginTest(unittest.TestCase):
         view = self._view(e)
         self.assertEqual(view["title"], "Renamed")   # lawful part landed
         self.assertEqual(view["status"], "open")     # task facet intact
-        # the out-of-projection change was refused visibly, not dropped
+        # the out_of_projection change was refused visibly, not dropped
         rows = self.conn.execute(
             "SELECT reason FROM refusal WHERE wrapper = 'ical' "
             "AND entity = ?", (e,)).fetchall()
-        self.assertIn(("out-of-projection",), rows)
+        self.assertIn(("out_of_projection",), rows)
         # tasks/ still renders the task
         status, _, body = _request(self.app, "GET", "/test/tasks/t.ics")
         self.assertIn("BEGIN:VTODO", body.decode())

@@ -11,8 +11,8 @@ Rules:
 - `uid` is provenance (`jcal:uid`), never identity — entity ids are minted;
   a changed `uid` is an ordinary revision (the adapter's `_by_uid`
   resolution is what keeps uid->entity alignment);
-- non-object JSON / unparseable input -> refusal 'parse-fail';
-- `dtstart`/`dtend` must be ISO-8601 with 'Z' -> else 'tz-unsupported';
+- non-object JSON / unparseable input -> refusal 'parse_fail';
+- `dtstart`/`dtend` must be ISO-8601 with 'Z' -> else 'tz_unsupported';
 - unmapped keys round-trip losslessly via `jcal:extra` (json);
 - `jcal:path` is owned by the jsonfile adapter, never emitted/parsed here.
 """
@@ -78,10 +78,10 @@ class JsoncalWrapper:
         try:
             item = json.loads(rep)
         except ValueError as f:
-            return PutResult(refusals=(Refusal("jcal", "parse-fail", e=e, payload=str(f)),))
+            return PutResult(refusals=(Refusal("jcal", "parse_fail", e=e, payload=str(f)),))
         if not isinstance(item, dict):
             return PutResult(refusals=(
-                Refusal("jcal", "parse-fail", e=e, payload="item is not a JSON object"),))
+                Refusal("jcal", "parse_fail", e=e, payload="item is not a JSON object"),))
         v = view or {}
         uid = item.get("uid")
         cur_uid = v.get("jcal:uid")
@@ -89,7 +89,7 @@ class JsoncalWrapper:
             val = item.get(key)
             if val is not None and not _is_utc_instant(val):
                 return PutResult(refusals=(
-                    Refusal("jcal", "tz-unsupported", e=e, a=_KEY_TO_ATTR[key],
+                    Refusal("jcal", "tz_unsupported", e=e, a=_KEY_TO_ATTR[key],
                             payload=str(val)),))
 
         changes: list[Change] = []

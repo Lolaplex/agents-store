@@ -141,12 +141,12 @@ class TestMediation(PocCase):
         self.assertEqual(self._view(e)["title"], "x")  # derived value lands
         res = self.store.transact(
             [Change(e=e, a="title", v="hijack")], wrapper="ical")
-        self.assertTrue(any(r.reason == "derived-attr"
+        self.assertTrue(any(r.reason == "derived_attr"
                             for r in res.refusals), res.refusals)
         self.assertEqual(self._view(e)["title"], "x")  # unchanged
         # and the refusal is on record
         rows = self.conn.execute(
-            "SELECT reason FROM refusal WHERE reason='derived-attr'"
+            "SELECT reason FROM refusal WHERE reason='derived_attr'"
         ).fetchall()
         self.assertTrue(rows)
 

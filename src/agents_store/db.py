@@ -5,7 +5,7 @@ import sqlite3
 from importlib import resources
 from pathlib import Path
 
-SCHEMA_VERSION = 4
+SCHEMA_VERSION = 5
 
 _HISTORY_TABLES = (
     "tx", "lineage", "certificate", "grant_", "refusal", "provenance",
@@ -94,6 +94,41 @@ def _migrate_v4(conn: sqlite3.Connection) -> None:
     conn.execute("PRAGMA user_version = 4")
 
 
+
+def _migrate_v5(conn: sqlite3.Connection) -> None:
+    """Refusal.reason ids: kebab-case -> snake_case. Idempotent one-shot.
+
+    The refusal table is append-only at runtime; this migration briefly drops
+    the update trigger, rewrites the known reason ids, and restores it.
+    Already-snake rows and unknown reasons are left untouched.
+    """
+    if conn.execute("PRAGMA user_version").fetchone()[0] >= 5:
+        return
+    renames = (
+        ("parse-fail", "parse_fail"),
+        ("tz-unsupported", "tz_unsupported"),
+        ("uid-mismatch", "uid_mismatch"),
+        ("status-map", "status_map"),
+        ("id-mismatch", "id_mismatch"),
+        ("mediator-conflict", "mediator_conflict"),
+        ("unknown-entity", "unknown_entity"),
+        ("path-collision", "path_collision"),
+        ("derived-attr", "derived_attr"),
+        ("unknown-attr", "unknown_attr"),
+        ("no-grant", "no_grant"),
+        ("no-capability-path", "no_capability_path"),
+        ("out-of-projection", "out_of_projection"),
+    )
+    conn.execute("DROP TRIGGER IF EXISTS refusal_no_update")
+    for old, new in renames:
+        conn.execute("UPDATE refusal SET reason = ? WHERE reason = ?", (new, old))
+    conn.execute(
+        "CREATE TRIGGER IF NOT EXISTS refusal_no_update BEFORE UPDATE ON refusal "
+        "BEGIN SELECT RAISE(ABORT, 'refusal is append-only'); END"
+    )
+    conn.execute("PRAGMA user_version = 5")
+
+
 def connect(path: str | Path = ":memory:") -> sqlite3.Connection:
     """Open (or create) a store database. Idempotent: safe on an existing file."""
     conn = sqlite3.connect(str(path), isolation_level=None)
@@ -108,6 +143,7 @@ def connect(path: str | Path = ":memory:") -> sqlite3.Connection:
     _migrate_v2(conn)
     _migrate_v3(conn)
     _migrate_v4(conn)
+    _migrate_v5(conn)
     if conn.execute("PRAGMA user_version").fetchone()[0] < SCHEMA_VERSION:
         conn.execute(f"PRAGMA user_version = {SCHEMA_VERSION}")
     return conn

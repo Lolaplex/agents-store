@@ -41,8 +41,8 @@ _MAPPED_ATTRS = ("title", "status", "when", "end")
 # - `tasks` renders VTODO (full round-trip set).
 # The write-set names what a surface may change. A PUT that alters
 # anything outside it is NOT silently dropped and NOT wholly rejected:
-# the out-of-projection changes become `refusal` rows of reason
-# 'out-of-projection' while the lawful part lands.
+# the out_of_projection changes become `refusal` rows of reason
+# 'out_of_projection' while the lawful part lands.
 COMPONENT = {"calendar": "VEVENT", "tasks": "VTODO"}
 WRITE_SETS = {
     "calendar": {"title", "when", "end", "ical:extra"},
@@ -301,7 +301,7 @@ class Collection(BaseCollection):
             (keep if c.a in allowed else dropped).append(c)
         for c in dropped:
             store.record_refusal(Refusal(
-                wrapper="ical", reason="out-of-projection", e=e, a=c.a,
+                wrapper="ical", reason="out_of_projection", e=e, a=c.a,
                 payload=f"{self._collection_name} cannot write {c.a} "
                         f"({'retract' if not c.added else c.v})"))
         changes = keep

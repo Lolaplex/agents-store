@@ -10,11 +10,11 @@ Laws:
 - derived values are datoms like any other (append-only, viewable); the
   provenance rows are what marks them derived;
 - a mediated attr never clobbers a NON-derived current value — that is a
-  visible `mediator-conflict` refusal, not silent takeover;
+  visible `mediator_conflict` refusal, not silent takeover;
 - derivation runs under the internal authority ('store'): the mediator is
   substrate-generated code, its provenance says so;
 - writes to derived attrs from OTHER wrappers are handled in transact
-  (T16): equal+witnessed edges invert to the source, else 'derived-attr'.
+  (T16): equal+witnessed edges invert to the source, else 'derived_attr'.
 """
 from __future__ import annotations
 
@@ -150,7 +150,7 @@ def _rederive(store, m: Mediator, entities: set[str]) -> dict:
             if cur_set - src_set and live_mid != m.id:
                 # value present that this mediator did not produce
                 store.record_refusal(Refusal(
-                    wrapper="store", reason="mediator-conflict", e=e, a=a_to,
+                    wrapper="store", reason="mediator_conflict", e=e, a=a_to,
                     payload=f"mediator {m.id}: {a_to} has non-derived value"))
                 report["conflicts"] += 1
                 continue

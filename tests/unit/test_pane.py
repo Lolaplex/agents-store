@@ -43,7 +43,7 @@ class TestPane(unittest.TestCase):
         self.assertEqual(targets(self.conn, self.reg, e), set())
         r = render(self.conn, self.reg, e, "html")
         self.assertIsInstance(r, Refusal)
-        self.assertEqual(r.reason, "no-capability-path")
+        self.assertEqual(r.reason, "no_capability_path")
 
     def test_note_has_markdown_and_html_not_ical(self):
         e = self.make({"body": "b"})

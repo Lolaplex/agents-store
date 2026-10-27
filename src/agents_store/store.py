@@ -98,7 +98,7 @@ class Store:
                         mediated.add(mid)
                     else:
                         refusals.append(self._refuse(
-                            wrapper, ch.e, ch.a, "derived-attr", ch.v))
+                            wrapper, ch.e, ch.a, "derived_attr", ch.v))
                     continue
             planned.append((ch, wrapper))
         if mediated:
@@ -108,7 +108,7 @@ class Store:
             (op, agent, wrapper, note),
         ).lastrowid
         if tx_changes is not None:
-            # internal authority: no derived-attr mediation applies
+            # internal authority: no derived_attr mediation applies
             planned.extend((ch, wrapper) for ch in tx_changes(tx_id, entity))
         minted: str | None = None
         applied: list[Datom] = []
@@ -123,7 +123,7 @@ class Store:
                     )
                 e = minted
             elif not self._exists(e):
-                refusals.append(self._refuse(wrapper, e, ch.a, "unknown-entity", ch.v))
+                refusals.append(self._refuse(wrapper, e, ch.a, "unknown_entity", ch.v))
                 continue
             outcome = self._apply(e, ch, tx_id, ch_wrapper)
             if isinstance(outcome, Refusal):
@@ -144,10 +144,10 @@ class Store:
     def _apply(self, e: str, ch: Change, tx_id: int, wrapper: str) -> list[Datom] | Refusal:
         spec = self._spec(ch.a)
         if spec is None:
-            return self._refuse(wrapper, e, ch.a, "unknown-attr", ch.v)
+            return self._refuse(wrapper, e, ch.a, "unknown_attr", ch.v)
         value_type, cardinality = spec
         if not is_writable(self.conn, wrapper, ch.a):
-            return self._refuse(wrapper, e, ch.a, "no-grant", ch.v)
+            return self._refuse(wrapper, e, ch.a, "no_grant", ch.v)
         v_text = _encode(value_type, ch.v)
         out: list[Datom] = []
         if ch.added:

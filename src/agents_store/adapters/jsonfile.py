@@ -4,7 +4,7 @@ All file I/O for the jcal projection lives here. The 'jcal' wrapper stays
 pure (item object <-> changes).
 
 Rules:
-- the file is a JSON array of item objects; anything else -> 'parse-fail';
+- the file is a JSON array of item objects; anything else -> 'parse_fail';
 - resolution: `jcal:uid` datum first, then `uid == entity id` (re-exported
   items carry minted ids); unresolved or absent uid -> mint;
 - `jcal:path` = '<relpath>#<uid>' marks file membership; an item removed
@@ -87,11 +87,11 @@ def sync(store: Store, path: str | Path, w: JsoncalWrapper | None = None) -> Syn
         try:
             data = json.loads(path.read_text(encoding="utf-8"))
         except ValueError as ex:
-            rep.refusals.append(_refuse(store, "parse-fail", payload=f"{tag}: {ex}"))
+            rep.refusals.append(_refuse(store, "parse_fail", payload=f"{tag}: {ex}"))
             return rep
         if not isinstance(data, list):
             rep.refusals.append(
-                _refuse(store, "parse-fail", payload=f"{tag}: top level is not an array"))
+                _refuse(store, "parse_fail", payload=f"{tag}: top level is not an array"))
             return rep
         items = data
 
@@ -99,7 +99,7 @@ def sync(store: Store, path: str | Path, w: JsoncalWrapper | None = None) -> Syn
     for i, item in enumerate(items):
         rep.scanned += 1
         if not isinstance(item, dict):
-            rep.refusals.append(_refuse(store, "parse-fail",
+            rep.refusals.append(_refuse(store, "parse_fail",
                                         payload=f"{tag}[{i}]: not an object"))
             continue
         raw_uid = item.get("uid")

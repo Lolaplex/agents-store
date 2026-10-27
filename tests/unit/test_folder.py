@@ -65,7 +65,7 @@ class TestSync(FolderCase):
     def test_unknown_entity_refused(self):
         self.write("ghost.md", "---\nid: NOPE\ntitle: x\n---\nb")
         rep = sync(self.store, self.root, self.w)
-        self.assertIn("unknown-entity", {r.reason for r in rep.refusals})
+        self.assertIn("unknown_entity", {r.reason for r in rep.refusals})
         self.assertIn("title: x", (self.root / "ghost.md").read_text())  # untouched
 
     def test_rename_keeps_id(self):
@@ -107,7 +107,7 @@ class TestSync(FolderCase):
             wrapper="store").entity
         self.write("taken.md", "---\ntitle: squatter\n---\nb")
         rep = sync(self.store, self.root, self.w)
-        self.assertIn("path-collision", {r.reason for r in rep.refusals})
+        self.assertIn("path_collision", {r.reason for r in rep.refusals})
         self.assertFalse((self.root / "taken.md").read_text().startswith("---\nid:"))
 
     def test_id_edit_refused(self):
@@ -117,7 +117,7 @@ class TestSync(FolderCase):
         forged = text.replace("id: ", "id: FORGED", 1)
         self.write("a.md", forged)
         rep = sync(self.store, self.root, self.w)
-        self.assertIn("unknown-entity", {r.reason for r in rep.refusals})
+        self.assertIn("unknown_entity", {r.reason for r in rep.refusals})
 
 
 if __name__ == "__main__":
