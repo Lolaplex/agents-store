@@ -113,7 +113,7 @@ class StoreBackedLog(unittest.TestCase):
         self.assertEqual({d.tx for d in hist}, {tx_id})
         attrs = {d.a for d in hist}
         self.assertEqual(attrs, {"more:type", "more:actor", "more:at", "more:body",
-                                 "more:subject_ptr", "more:pinned_against", "more:pin",
+                                 "more:subject_ptr", "more:pinned_against", "more:pin", "more:said",
                                  "title", "body", "more:topic"})
         self.assertEqual(self.store.view(ev.id)["more:pin"], (f"{ev.id}@{tx_id}",))
 

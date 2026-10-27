@@ -14,6 +14,7 @@ INSERT OR IGNORE INTO attr (name, value_type, cardinality, doc) VALUES
   ('more:subject_ptr', 'text', 'many', 'MORe subject that is not a store entity: pointer target id (artifact id or external locator), never a copy'),
   ('more:pinned_against', 'text', 'many', 'MORe envelope pinned_against, verbatim: artifact@version, commit or baseline'),
   ('more:pin',     'text',    'many', 'version pin as entity@tx'),
+  ('more:said',    'text',    'one',  'KERI/CESR Blake3-256 SAID of the event content, bound to the event name (E + 43 chars)'),
   ('more:body',    'json',    'one',  'MORe type-specific body'),
   ('more:topic',   'text',    'one',  'MORe decision question / ADR topic');
 
@@ -21,5 +22,5 @@ INSERT OR IGNORE INTO kind (name, required, optional, derivations) VALUES
   ('event', '["when"]',   '["end","title"]',  '[{"attr":"end","from":["when"],"rule":"plus_1h"}]'),
   ('task',  '["status"]', '["when","title"]', '[]'),
   ('note',  '["body"]',   '["title"]',        '[]'),
-  ('more-event', '["more:type","more:actor"]', '["more:at","more:subject","more:subject_ptr","more:pinned_against","more:pin","more:body"]', '[]'),
-  ('decision', '["title","body","more:topic","more:pin"]', '["more:type","more:actor","more:at","more:subject","more:subject_ptr","more:pinned_against"]', '[]');
+  ('more-event', '["more:type","more:actor"]', '["more:at","more:subject","more:subject_ptr","more:pinned_against","more:pin","more:body","more:said"]', '[]'),
+  ('decision', '["title","body","more:topic","more:pin"]', '["more:type","more:actor","more:at","more:subject","more:subject_ptr","more:pinned_against","more:said"]', '[]');

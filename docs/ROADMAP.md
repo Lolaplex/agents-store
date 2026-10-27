@@ -73,6 +73,12 @@ rotation, interaction seals, witness receipts, checkpoints), per
 `Cypoe/isa-physics` `docs/RFC/PHI_IDENTITY.md`:
 - the entity id stays minted; the event's SAID is an attribute, and the chain link is a
   `ref` to the prior event entity;
+- name-as-identity vs SAID-as-content: MORe events already follow the first half
+  (`more:said`, schema v4, see `docs/more/README.md`). There, the minted name is
+  the reference target and the SAID only fingerprints that name's content. That
+  is distinct from PHI_IDENTITY's KERI identity layer, where an AID plus its
+  signed key event log establish *who* controls an identifier. A content SAID
+  carries no key state and no signature;
 - bodies are stored byte-exact (canonical JSON). Signatures are qualified primitives; no
   secrets;
 - the lolaplex-board DID event log is the first import source (ULID row ids, canonical

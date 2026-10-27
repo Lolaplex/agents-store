@@ -97,12 +97,75 @@ difference, so a re-run is a no-op.
 a pointer target has since become a store entity, it turns that pointer into
 a ref.
 
-**Later: SAIDs.** Not implemented. A self-addressing id would be one more
-additive attr on the event entity (e.g. `more:said`, text, one), plus SAID
-values accepted wherever a pin or pointer target is a string today. Refs hold
-device-local entity ids, while envelopes keep the portable strings. Adding a
-SAID does not change the shape of `more:subject`, `more:subject_ptr` or
-`more:pinned_against`.
+## Event SAIDs (schema v4)
+
+**Name vs. content.** The event's *name* (event id = entity id, a minted
+ULID) stays the reference target for lineage edges, `more:pin` (`eid@tx`),
+supersession and overrule. The *SAID* is a separate content digest, written
+as `more:said` (text, cardinality one) in the event's own tx. That datom is
+the name → SAID binding. A correction or supersession is a new event with a
+new name and a new SAID; nothing is rewritten.
+
+**Scheme** (`agents_store.more.said`, KERI/CESR as in keripy `Saider`):
+
+- digest: BLAKE3-256 (the `blake3` package is a runtime dependency; no SHA2
+  fallback);
+- encoding: CESR qb64, code `E` (`Blake3_256`). That is base64url of one zero
+  lead byte followed by the 32 raw bytes, with the first char replaced by `E`,
+  44 chars in total (`E[A-P][A-Za-z0-9_-]{42}`);
+- digesting: the `d` field holds the KERI placeholder `'#' * 44`, and the
+  result replaces it;
+- hashed body (the SAD): `d`, `i` (= the event name), then the envelope fields
+  in `events._ENVELOPE` order (`type`, `actor`, `at`, `pinned_against`,
+  `subjects`, `reason`, `supersedes`, `signals`, `provenance`, `body`).
+  Because `i` is hashed, the same content under another name has another
+  SAID, so a SAID cannot be rebound to a different name. The log's
+  `seq`/`prev`/`digest` are not hashed; the sha256 chain column stays as it
+  is.
+
+**Canonical serialization: KERI fixed field order, not JCS.** The SAD is
+serialized the way keripy does it: compact JSON
+(`json.dumps(sad, separators=(",", ":"), ensure_ascii=False)`, UTF-8) in the
+SAD's own field order, and the top-level order above is fixed. Nested objects
+(`body`, …) have no schema-fixed order, so their keys are sorted (code-point
+order, as with `sort_keys=True`). The reasons: keripy's
+`Saider.saidify`/`verify` reproduce our SAIDs unchanged, which JCS's
+lexicographic top-level order and ES6 number formatting would not. It also
+matches KERI/ACDC practice, where the field order is part of the schema.
+Floats are serialized by Python's `json`; prefer integers or strings in event
+bodies when you need cross-implementation SAIDs.
+
+**Test vectors** (`tests/more/test_said.py`):
+
+- BLAKE3 reference digests for `""` and `"abc"`;
+- keripy `test_diger`: `Diger(ser=b"abc…789")` gives
+  `ELC5L3iBVD77d_MYbYGGCUQgqQBju1o4x1Ud-z2sL-ux`;
+- keripy `test_saider`: the JSON-Schema SAD with label `$id` gives
+  `EMRvS7lGxc1eDleXBkvSHkFs8vUrslRcla6UXOJdcczw`. Both vectors are from
+  WebOfTrust/keripy `tests/core/test_coring.py` at `a6866a3`;
+- one event SAD, with its exact serialized bytes and SAID, cross-checked with
+  keripy 1.3.6 (`Saider.saidify` gives the same qb64 and `Saider.verify` holds).
+
+**Pins and pointers.** `more:pin` stays `eid@tx`. `pinned_against` values and
+pointer targets may also be `X@<SAID>`. They are stored verbatim and found by
+`events_pinned_against` / `events_pinned_to`. `more.query.resolve(store, ref)`
+classifies a ref as `said`, `pin`, `floating` or `external` and verifies an
+`X@<SAID>` against X's `more:said` (`ok` is True/False, or None when X is
+not a store entity). `events_by_said(store, said)` returns the event name
+bound to a SAID.
+
+**Migration.** `_migrate_v4` (`PRAGMA user_version` 3 → 4) adds `more:said`
+and lists it as optional on the `more-event` and `decision` kinds. It then
+asserts the SAID, recomputed from each stored envelope and event name, on
+every event entity that has none, in one internal `evolve` tx with the note
+`more:migrate said (v4)`. A re-run writes nothing. A stored `more:said` that
+differs from the recomputed one is not overwritten: `migrate_said` raises
+`SaidMismatch` and rolls back.
+
+**Identity layer.** This is not the PHI_IDENTITY identity layer (ROADMAP §5).
+A MORe SAID identifies *content*, bound to a minted name. A KERI identifier
+(AID) and its key event log identify a *controller*. Event SAIDs are not
+signed and establish no key state.
 
 ## Still owned by the board
 

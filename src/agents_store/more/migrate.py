@@ -1,4 +1,6 @@
-"""Backfill for queryable MORe references (schema v3).
+"""Backfills for MORe datoms: queryable references (schema v3) and SAIDs (v4).
+
+v3 (migrate_queryable_refs):
 
 Databases written before v3 hold every subject as a text more:subject datom
 and pinned_against only inside the event envelope. migrate_queryable_refs():
@@ -13,6 +15,12 @@ and pinned_against only inside the event envelope. migrate_queryable_refs():
 
 Idempotent: a second run finds no difference and writes no tx. It can be
 re-run later, e.g. after a pointer target became a store entity.
+
+v4 (migrate_said): adds the more:said attr (and the kind optionals) and
+asserts more:said, computed from the stored envelope and the event name, on
+every event entity that has none, in one 'evolve' tx. An existing more:said
+that differs from the recomputed SAID is not overwritten: the migration
+raises SaidMismatch (a name is never rebound to other content). Idempotent.
 """
 from __future__ import annotations
 
@@ -24,9 +32,11 @@ from agents_store.grant import INTERNAL_WRAPPER
 from agents_store.store import Store
 
 from .events import Event
+from .said import event_said
 from .store_bridge import pinned_changes, subject_changes
 
 NOTE = "more:migrate queryable-refs (v3)"
+NOTE_SAID = "more:migrate said (v4)"
 
 _ATTRS = (
     ("more:subject_ptr", "text", "many",
@@ -100,6 +110,72 @@ def migrate_queryable_refs(conn: sqlite3.Connection) -> int | None:
             result = store.transact(changes, wrapper=INTERNAL_WRAPPER, op="evolve", note=NOTE)
             if result.refusals:
                 raise RuntimeError(f"migrate_queryable_refs: refused {result.refusals}")
+            tx = result.tx
+        if own:
+            conn.execute("COMMIT")
+        return tx
+    except BaseException:
+        if own:
+            conn.execute("ROLLBACK")
+        raise
+
+
+class SaidMismatch(RuntimeError):
+    """A stored more:said differs from the SAID recomputed from the envelope."""
+
+
+_SAID_ATTR = ("more:said", "text", "one",
+              "KERI/CESR Blake3-256 SAID of the event content, bound to the event name (E + 43 chars)")
+
+
+def _said_vocabulary(conn: sqlite3.Connection) -> None:
+    conn.execute(
+        "INSERT OR IGNORE INTO attr (name, value_type, cardinality, doc) VALUES (?, ?, ?, ?)",
+        _SAID_ATTR)
+    for kind in ("more-event", "decision"):
+        row = conn.execute("SELECT optional FROM kind WHERE name = ?", (kind,)).fetchone()
+        if row is None:
+            continue
+        opt = json.loads(row[0])
+        if "more:said" not in opt:
+            conn.execute("UPDATE kind SET optional = ? WHERE name = ?",
+                         (json.dumps(opt + ["more:said"]), kind))
+
+
+def planned_said_changes(store: Store) -> list[Change]:
+    """more:said for every materialized event that has none. Raises
+    SaidMismatch when a stored SAID does not match its envelope."""
+    out: list[Change] = []
+    rows = store.conn.execute(
+        "SELECT e.id, e.envelope FROM event e JOIN entity n ON n.id = e.id ORDER BY e.seq"
+    ).fetchall()
+    for eid, envelope in rows:
+        want = event_said(Event.from_envelope(json.loads(envelope)), eid)
+        have = store.view(eid).get("more:said")
+        if have is None:
+            out.append(Change(eid, "more:said", want))
+        elif have != want:
+            raise SaidMismatch(f"{eid}: stored more:said {have} != {want}")
+    return out
+
+
+def migrate_said(conn: sqlite3.Connection) -> int | None:
+    """Run the v4 vocabulary change and SAID backfill. Returns the backfill
+    tx id, or None when nothing had to change."""
+    if not (_has_table(conn, "entity") and _has_table(conn, "event")):
+        return None
+    own = not conn.in_transaction
+    if own:
+        conn.execute("BEGIN IMMEDIATE")
+    try:
+        _said_vocabulary(conn)
+        store = Store(conn)
+        changes = planned_said_changes(store)
+        tx = None
+        if changes:
+            result = store.transact(changes, wrapper=INTERNAL_WRAPPER, op="evolve", note=NOTE_SAID)
+            if result.refusals:
+                raise RuntimeError(f"migrate_said: refused {result.refusals}")
             tx = result.tx
         if own:
             conn.execute("COMMIT")

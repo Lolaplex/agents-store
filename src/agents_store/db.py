@@ -5,7 +5,7 @@ import sqlite3
 from importlib import resources
 from pathlib import Path
 
-SCHEMA_VERSION = 3
+SCHEMA_VERSION = 4
 
 _HISTORY_TABLES = (
     "tx", "lineage", "certificate", "grant_", "refusal", "provenance",
@@ -84,6 +84,16 @@ def _migrate_v3(conn: sqlite3.Connection) -> None:
     conn.execute("PRAGMA user_version = 3")
 
 
+def _migrate_v4(conn: sqlite3.Connection) -> None:
+    """MORe SAIDs: more:said on every event entity, backfilled from the
+    stored envelopes."""
+    if conn.execute("PRAGMA user_version").fetchone()[0] >= 4:
+        return
+    from .more.migrate import migrate_said
+    migrate_said(conn)
+    conn.execute("PRAGMA user_version = 4")
+
+
 def connect(path: str | Path = ":memory:") -> sqlite3.Connection:
     """Open (or create) a store database. Idempotent: safe on an existing file."""
     conn = sqlite3.connect(str(path), isolation_level=None)
@@ -97,6 +107,7 @@ def connect(path: str | Path = ":memory:") -> sqlite3.Connection:
     )
     _migrate_v2(conn)
     _migrate_v3(conn)
+    _migrate_v4(conn)
     if conn.execute("PRAGMA user_version").fetchone()[0] < SCHEMA_VERSION:
         conn.execute(f"PRAGMA user_version = {SCHEMA_VERSION}")
     return conn

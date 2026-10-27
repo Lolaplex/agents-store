@@ -57,6 +57,7 @@ class Event:
     seq: int | None = None
     prev: str | None = None
     digest: str | None = None
+    said: str | None = None      # CESR content digest bound to id (said.py)
 
     def __post_init__(self) -> None:
         for name in ("subjects", "pinned_against", "supersedes", "signals"):
