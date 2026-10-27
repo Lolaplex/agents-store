@@ -1,6 +1,6 @@
 {
   "version": 4,
-  "status": "vendored from Cypoe/more-framework@3681d271 (kernel-impl tip e32e5c3); v4 adds append-only decision/evidence events as core primitives",
+  "status": "proposal v4 (not pushed): v3 + append-only decision/evidence events as core primitives (Koru git practice + BEL Nachweis/Entscheidung). v3 kept as kernel-proposal.v3.json",
   "description": "Lean MORe kernel. One invariant organises everything: every artifact is held exactly once; everything else is a pointer or a lossless, regenerable projection. Relations, gates, lifecycle and profiles are layered on the four core primitives.",
   "sources": {
     "HOME": "more-framework.org home: 'Eine Spezifikation. Viele Ableitungen. Keine zweite Wahrheit.'",
@@ -14,7 +14,7 @@
     "ZOHO": "Beispiel ZOHO ONE Meeting-Schaltflaeche V8.0 (Confluence export v.9, 2026-07-14, /download/beispiele/)",
     "DEMO": "more-framework.org/demo/index.html bundle assets/index-Cy1hzhS9.js (UC-042 Adressaenderung, R-17)",
     "US": "Whitepaper User Stories im regulierten Umfeld (DE/EN, 2026-07-26)",
-    "inventory": "Cypoe/more-framework@e32e5c3:lean-model/kernel-proposal.json (sources block)",
+    "inventory": "see /workspace/more/sources.md",
     "KORU": "korulang/koru git log @24c1538c0 (3,756 commits) + hooks/commit-msg.cjs + membrane SKILL; see /workspace/koru-distill/DISCIPLINE.md §9-10",
     "WPUS": "Why User Stories Are Not Enough in Regulated Environments (EN, 2026-07-26)",
     "LEI": "site /leistungen (fetched 2026-10-17)",
@@ -142,7 +142,7 @@
       "src": "BEL §9 'Ein Link ohne Versionsbezug behauptet stillschweigend, dass jede Fassung von A zu jeder Fassung von B passt.'"
     },
     "projection": {
-      "meaning": "A declared, pure derivation from source artifacts at pinned versions. Views, documents, generated schemas, caches, indexes, counts and mirrors are all projections.",
+      "meaning": "A declared, pure function of source artifacts at pinned versions: a view (Sicht). Views, caches, indexes, counts and mirrors are projections. Generated XSD/API schemas, validators and generated tests are derivatives, not projections (core_primitives.derivative; C21, more-lean-model.md §15). Generated documentation (reference, API docs, field catalogue) is a projection, a Publikationssicht (BEL §5.2); manuals and handbooks are derivatives; prose-written specs are sources (core_primitives.derivative.documentation_split; ruling C21 Q6).",
       "fields": {
         "id": "projection id",
         "sources": "list of pointers (artifact@version)",
@@ -163,20 +163,160 @@
       "derivable_set": {
         "src": "ELSTER §6.2, §6.3",
         "kinds": [
-          "xsd_or_json_schema",
           "field_catalogue_and_rule_docs",
-          "validators_with_stable_rule_ids",
-          "tests_and_boundary_tests",
           "mapping_and_implementation_parameters",
           "release_and_change_docs_from_version_and_decision_history",
           "traceability_evidence_reports"
         ],
         "excluded": "application code ('model-driven bei der Spezifikation, nicht generator-driven bei der Implementierung')",
+        "moved_to_derivative": "xsd_or_json_schema, validators_with_stable_rule_ids and tests_and_boundary_tests moved to core_primitives.derivative.derivable_set (C21, 2026-10-27). The remaining kinds stay projections. Ruling C21 Q6 confirms it for generated documentation: field_catalogue_and_rule_docs and the release docs are Publikationssichten (BEL §5.2), not derivatives.",
         "note": "'Generieren heisst: Eine erzeugte Repraesentation darf nicht manuell zur zweiten Wahrheit werden.'"
       },
       "ordering_example": {
         "src": "ELSTER §3.4, §7.3",
         "text": "XML generator sorts deterministically by serializationOrder; XSD sequence is a projection property, not business semantics"
+      }
+    },
+    "derivative": {
+      "meaning": "An Ableitung: an artifact derived from a source (spec element or IR) at a pinned version that is a typed interpretation, not a view. It hangs on its source through derives_from (inverse derives_into) with preserves[] per purpose. It has a required mode: generated (validators, generated tests, XSD/API schemas, generated target code) or authored (written by a person from pinned sources). Manuals and handbooks may be either mode. Application code is not a derivative (implementation, linked by implements).",
+      "fields": {
+        "id": "artifact id (minted, stable)",
+        "mode": "required: generated | authored (see modes)",
+        "source": "generated: pointer to source@version (spec element or IR@hash) via derives_from",
+        "generator": "generated: generator@version",
+        "profile": "generated: target profile@version, when the generator takes one",
+        "output_hash": "generated: hash of the output as generated",
+        "author": "authored: the person who wrote it (required)",
+        "sources": "authored: the pinned sources@versions it was written from (at least one; replaces generator@version)",
+        "preserves": "on the derives_from edge: (purpose, invariant) pairs that must hold in the output"
+      },
+      "rules": [
+        "pure (generated): same source@version + generator@version + profile@version => same output",
+        "never hand-edited (generated): edits go to the source, then the derivative is generated again (ELSTER Phase D, §11.2)",
+        "authored: written by its author from pinned sources@versions; a superseded pinned source makes it stale (derivative_stale), and its preserves[] are checked like a generated one (derivative_drops_preserved)",
+        "lossy is allowed only if declared: a dropped invariant must not be in preserves for that purpose",
+        "a run of a derivative (validator, test) is not a new kind: it yields a verification event (the verdict) pinned to source@v and derivative@v; that event is the evidence for the derivation claim of the edge. No separate Gate kind (C21 ruling 1)"
+      ],
+      "derivable_set": {
+        "src": "ELSTER §6.2; MP p.6 (XSD as typed interpretation)",
+        "kinds": [
+          "xsd_or_json_schema",
+          "validators_with_stable_rule_ids",
+          "tests_and_boundary_tests",
+          "generated_target_code",
+          "manuals_and_handbooks"
+        ],
+        "note": "generated_target_code is generated output of a target profile (agents-design targets), not application code; ELSTER §6.3 excludes application code from generation. manuals_and_handbooks: ruling C21 Q6 (see documentation_split). manuals_and_handbooks may be generated or authored (Fabian, 2026-10-27); the other kinds have mode generated."
+      },
+      "documentation_split": {
+        "ruling": "C21 Q6 (Fabian, 2026-10-27, relayed via klanker): 'docs sind ja die prose written specs, actual documentation are projections, manuals/handbooks are derivates'",
+        "kinds": {
+          "prose_spec": {
+            "standing": "source",
+            "meaning": "a prose-written spec (e.g. a repo's docs/ calculus or concept text) is MORe source material: an artifact held once at its home, edited there, pointed to. It is neither generated nor regenerable.",
+            "src": "BEL §5.1 (Abb. 4: 'Die strukturierte Feldspezifikation ist der fuehrende Informationsbestand fuer Mapping, Regeln und Ableitungen'); ELSTER §1, §13; ruling C21 Q6"
+          },
+          "generated_documentation": {
+            "standing": "projection",
+            "examples": [
+              "reference documentation",
+              "API documentation",
+              "field catalogue",
+              "rule docs",
+              "release and change docs"
+            ],
+            "meaning": "a view of the sources at pinned versions: pure, regenerable, never hand-edited, no preserves[] beyond the projection rules",
+            "src": "BEL §5.2 'API-Dokumentation, Feldkatalog, Prueflogiken und Anwenderdokumentation sind Publikationssichten, keine parallel gepflegten Wahrheiten'; IA §6, §14.3 ('Dokumente sind dort ausdruecklich Sichten auf Inhalte'); ELSTER §6.2; ruling C21 Q6"
+          },
+          "manual": {
+            "standing": "derivative",
+            "examples": [
+              "user manual",
+              "handbook",
+              "operations handbook",
+              "tutorial and how-to guidance"
+            ],
+            "meaning": "a purpose-shaped interpretation of the sources, not a view: a derivative, generated or authored. It hangs on its sources through derives_from with preserves[] per purpose. A derives_from edge without preserves is preserves_missing. Both modes: derivative_stale, derivative_drops_preserved. Generated: also generated_provenance_missing, derivative_hand_edited. Authored: also authored_provenance_missing.",
+            "src": "ruling C21 Q6 (Fabian's decision, 2026-10-27, both modes; no MORe source, see core_primitives.derivative.modes.source_search). Context: BEL §5.1 'Eine fachliche Regel wird nicht zusaetzlich in Feldkatalog, Codekommentar, Testbeschreibung und Handbuch gepflegt'; IA §14.3 (a MORe hierarchy is 'eine ideale Quelle fuer topic-basierte Anwenderdokumentation'; Diataxis: Tutorial, Anleitung, Referenz, Erklaerung)",
+            "modes": [
+              "generated",
+              "authored"
+            ]
+          }
+        },
+        "divergence": {
+          "kind": "ruling_divergence",
+          "source": "BEL v1.2 §5.2",
+          "source_text": "API-Dokumentation, Feldkatalog, Prueflogiken und Anwenderdokumentation sind Publikationssichten, keine parallel gepflegten Wahrheiten.",
+          "also": "US §8 lists Anwenderdokumentation and Online-Hilfe among the Sichten generated from one Informationsbestand",
+          "kernel_rule": "manuals and handbooks are derivatives (derives_from with preserves[]), not Publikationssichten. Reference-style generated documentation stays a projection as BEL §5.2 says.",
+          "deviation": "BEL §5.2 puts Anwenderdokumentation with the projections; the kernel puts manuals and handbooks (user and operations handbooks, tutorials, how-to guidance) with the derivatives. Fabian's decision wins over the source text. No source text names manuals as derivatives or an authored mode (modes.source_search); both are Fabian's decision (2026-10-27).",
+          "provenance": {
+            "kind": "ruling",
+            "by": "Fabian Schindler",
+            "date": "2026-10-27",
+            "ruling": "C21 Q6",
+            "relayed_via": "klanker"
+          }
+        },
+        "purpose": "no MORe source names a purpose for manuals (searched: MP C.1, BEL §5, IA §6 and §14.3, US §8, ELSTER §6). purpose_register.profiles.agents_design registers manual as a profile addition with typed provenance, pending Fabian's approval (more-lean-model.md §12d)."
+      },
+      "src": "BEL v1.2 §7.2 ('Sichten, Ableitungen, Umsetzung, Nachweise ...'), §5.2.1, §10.2; MP p.6, p.6-7 (B.2); ELSTER §1, §6, §10 Phase D, §11.2; ruling C21 (Fabian, 2026-10-27)",
+      "modes": {
+        "values": [
+          "generated",
+          "authored"
+        ],
+        "required": true,
+        "generated": {
+          "record": "source@version, generator@version, profile@version (optional), output_hash",
+          "drift": [
+            "generated_provenance_missing",
+            "derivative_stale",
+            "derivative_hand_edited",
+            "derivative_drops_preserved"
+          ],
+          "examples": [
+            "validator",
+            "generated test",
+            "XSD/API schema",
+            "generated target code",
+            "generated manual or handbook (e.g. step-by-step manuals generated from procedures)"
+          ]
+        },
+        "authored": {
+          "record": "author, sources@versions (pinned) instead of generator@version",
+          "drift": [
+            "authored_provenance_missing",
+            "derivative_stale",
+            "derivative_drops_preserved"
+          ],
+          "not_applicable": [
+            "derivative_hand_edited",
+            "generated_provenance_missing"
+          ],
+          "examples": [
+            "authored user manual",
+            "authored handbook",
+            "operations handbook",
+            "tutorial and how-to guidance"
+          ]
+        },
+        "board": "The board (the 'author view of MORe') stays a projection: it is a pure fold over events, and authoring on it emits events. Authoring there does not make the board an authored derivative.",
+        "provenance": {
+          "kind": "ruling",
+          "by": "Fabian Schindler",
+          "date": "2026-10-27",
+          "ruling": "C21 Q6 (mode generated | authored; confirmed)",
+          "relayed_via": "klanker"
+        },
+        "source_search": {
+          "searched": "/workspace/more/pdf: ELSTER v1.2, BEL v1.2, MP, ZOHO V8.0, US (DE, EN), IA v1.4",
+          "found": "No source names an authored derivative mode, or manuals that must preserve invariants. BEL v1.2 §5.2.1 (text l.262-270) and §10.2 (l.951-955) ask for preserved invariants whenever a spec element is transferred into 'ein XSD, eine Validatorregel, eine Implementierung oder einen Testfall' and for 'Ableitungs-, Implementierungs- und Nachweisbeziehungen'. An Implementierung is not generated (ELSTER §6.3, l.322-340), so the sources tie invariant preservation to the transfer, not to generation. That supports derivative_drops_preserved for both modes; it does not source the authored mode or manuals as derivatives.",
+          "tension": "ELSTER §10 (l.505-512) treats manually maintained copies as something to replace by Ableitungen step by step; BEL §5.1 (l.248-249) says a rule is not maintained again in the Handbuch. An authored derivative keeps no own copy of a rule: it points at pinned sources and is checked by preserves[].",
+          "label": "mode=authored, 'manuals are derivatives' and 'manuals in both modes' are Fabian's decision (2026-10-27, C21 Q6); BEL §5.2 deviation: see documentation_split.divergence"
+        },
+        "manuals": "Manuals and handbooks may be either mode: generated or authored (Fabian, 2026-10-27, t218u: 'manual is well generated/authored manuals/handbooks'). The drift ids of the manual's mode apply."
       }
     },
     "drift_check": {
@@ -203,6 +343,54 @@
           "test": "property listed in 'preserves' differs between source and output"
         },
         {
+          "id": "derivative_stale",
+          "test": "a pinned input is superseded: source (IR), generator or profile version (generated); a pinned source version (authored)",
+          "src": "ELSTER §11.2 and Phase E (generated representations are generated again after a spec change); id: kernel naming addition (more-lean-model.md §12c)",
+          "applies_to_modes": [
+            "generated",
+            "authored"
+          ]
+        },
+        {
+          "id": "derivative_hand_edited",
+          "test": "the delivered bytes differ from the recorded output_hash",
+          "src": "ELSTER §10 Phase D 'Manuelle Aenderungen an generierten Artefakten werden im Build erkannt.'; id: kernel naming addition (§12c)",
+          "applies_to_modes": [
+            "generated"
+          ]
+        },
+        {
+          "id": "derivative_drops_preserved",
+          "test": "a (purpose, invariant) pair listed in the derives_from edge's preserves does not hold in the output",
+          "src": "BEL §5.2.1, §10.2; MP p.6-7 (B.2); id: kernel naming addition (§12c)",
+          "applies_to_modes": [
+            "generated",
+            "authored"
+          ]
+        },
+        {
+          "id": "generated_provenance_missing",
+          "test": "a generated output (derivative or projection) does not carry source@version, generator@version and output_hash (derivatives of mode generated; never authored ones)",
+          "src": "ELSTER §10 Phase D 'Generierte Dateien erhalten einen Versions- und Herkunftsnachweis.'; one id for derivatives and projections (C21 ruling 3); id: kernel naming addition (§12c)",
+          "applies_to_modes": [
+            "generated"
+          ]
+        },
+        {
+          "id": "authored_provenance_missing",
+          "test": "a derivative of mode authored does not carry its author and at least one pinned source@version",
+          "applies_to_modes": [
+            "authored"
+          ],
+          "src": "mode authored: Fabian's decision 2026-10-27 (C21 Q6). No source names this check; id: kernel naming addition (more-lean-model.md §12c), approved as final by Fabian 2026-10-27",
+          "approval": {
+            "status": "approved",
+            "by": "Fabian Schindler",
+            "date": "2026-10-27",
+            "ruling": "C21 Q6 (t218u)"
+          }
+        },
+        {
           "id": "pointer_unpinned",
           "test": "non-nav pointer without target_version"
         },
@@ -216,10 +404,10 @@
         }
       ],
       "maps_to_source_drift_kinds": {
-        "Definitionsdrift": "projection_drops_preserved",
-        "Regeldrift": "copy_diverged / projection_stale",
-        "Formatdrift": "projection_drops_preserved",
-        "Nachweisdrift": "pointer_unpinned / pointer_dangling"
+        "Definitionsdrift": "projection_drops_preserved / derivative_drops_preserved",
+        "Regeldrift": "copy_diverged / projection_stale / derivative_stale",
+        "Formatdrift": "projection_drops_preserved / derivative_drops_preserved",
+        "Nachweisdrift": "pointer_unpinned / pointer_dangling / generated_provenance_missing"
       },
       "src": "ELSTER §5.2 (four drift kinds), Phase D ('CI prueft Schema, Regeln, Regressionen und Artefaktdiffs'); BEL §10.4",
       "validation_stages": {
@@ -372,10 +560,16 @@
           "src": "PI; BEL §9 (reference != release)"
         },
         "derives_from": {
-          "reverse": "derived_into",
+          "reverse": "derives_into",
           "de": "wird abgeleitet aus",
-          "preserves": "required (it is a projection edge)",
-          "src": "BEL §5.2.1, ELSTER §6"
+          "preserves": "required (it is the derivation edge of a derivative, not a projection edge; C21)",
+          "src": "BEL §5.2.1, §7.2, ELSTER §6"
+        },
+        "derives_into": {
+          "reverse": "derives_from",
+          "de": "wird repraesentiert durch",
+          "preserves": "required (inverse of derives_from; a separate edge with the matching name)",
+          "src": "MP p.6 'wird repraesentiert durch' (proposed earlier as represented_by); name: ruling C21 (Fabian, 2026-10-27)"
         },
         "implements": {
           "reverse": "implemented_by",
@@ -421,14 +615,14 @@
       "claim_types": {
         "source": "MP p.5-6 (B.0/2): 'Jede Beziehung hat einen anderen Nachweisanspruch'",
         "mp_list": {
-          "wird repräsentiert durch": "represented_by (e.g. XSD)",
+          "wird repräsentiert durch": "derives_into (e.g. XSD; proposed earlier as represented_by, named derives_into by ruling C21)",
           "wird verfeinert durch": "is_refined_by",
           "wird umgesetzt durch": "implemented_by",
           "wird verifiziert durch": "verified_by (Testfall)",
           "wird validiert durch": "validated_by (Validator)",
           "wird abgenommen durch": "accepted_by (AC)"
         },
-        "gaps_vs_kernel": "represented_by, validated_by and accepted_by have no kernel type yet; proposed as additions, each declaring its evidence claim. MP B.3.2 plans 'Beziehungstypen als feste Liste' in the glossary; that list is not in MP.",
+        "gaps_vs_kernel": "validated_by and accepted_by have no kernel type yet (represented_by became the kernel type derives_into, C21); proposed as additions, each declaring its evidence claim. MP B.3.2 plans 'Beziehungstypen als feste Liste' in the glossary; that list is not in MP.",
         "rule": "relations are attributes of the existing relation layer, not a new layer (MP p.6 B.1; p.10 'Keine vierte Framework-Schicht')"
       }
     },
@@ -450,11 +644,12 @@
       "evidence": "BEL §9",
       "baseline": "BL, a set of pinned pointers (artifacts AND relations), BEL §5.3",
       "production_evidence": "PROD, ELSTER §11.3",
-      "implementation": "external artifact (code, story); held in its own home, pointed to, never copied; NOT a projection (ELSTER §6)"
+      "implementation": "external artifact (code, story); held in its own home, pointed to, never copied; NOT a projection (ELSTER §6)",
+      "derivative": "artifact with a required mode: generated (validator, generated test, XSD/API schema, generated target code) or authored (written from pinned sources); manuals and handbooks may be either, with derives_from + preserves[]; NOT a projection (BEL §7.2, MP p.6, ELSTER Phase D; C21; manuals and mode: C21 Q6, Fabian 2026-10-27)"
     },
     "projection_kinds": {
       "document": "IA §6 'Dokumente sind Sichten'",
-      "generated_representation": "XSD/API schema, field catalogue, validator, generated tests (ELSTER §6)",
+      "generated_representation": "field catalogue (ELSTER §6). XSD/API schema, validators and generated tests moved to artifact_types.derivative (C21). Generated documentation (reference, API docs, field catalogue, rule and release docs) is a projection (BEL §5.2 Publikationssichten; C21 Q6). Manuals and handbooks are derivatives (artifact_types.derivative).",
       "board_view": "list/kanban/timeline/story map (MAN artifacts; BEL §7 'vier Sichten auf denselben Bestand')",
       "aggregate": "counts, status rollups, unread badges - must be computed or declared caches with drift check",
       "mirror": "read-only display of an external artifact's content, always with source@version + regenerated, never edited"
@@ -857,7 +1052,6 @@
             "jwf_condition": "3 In technischer Beschreibung"
           }
         },
-        "kind_map_hierarchy_note": "Hierarchy kinds (domain..api_spec) are created by v1 create = registerIssue (board row, §12b) + registerNode (sourced; refusal author_node_invalid when the parent rule fails or the id exists). Levels and parent rule are sourced (LEI hierarchy; IA v1.4 §9 p.12; hierarchy.parent). Which levels feed JWF conditions 2 (BP/CM/AC) and 3 (UI/API) is the kernel mapping of More/Jwf.lean (Cypoe/more-framework@c56f457:lean-model/more-lean-model.md §12: 'The mapping is ours'), not source text. task/requirement/decision/test/cutover_step are unchanged; test and decision stay events/pointers, not TC/DEC nodes. Lean: Cypoe/more-framework@c56f457:kernel/More/BoardProjection.lean boardKindLevel; author calculus and examples live there (not vendored here).",
         "relation_map": {
           "depends": "depends_on",
           "refines": "refines",
@@ -875,15 +1069,110 @@
             "refusal": "author_pointer_invalid when preserves is empty"
           }
         },
-        "verbs": "unchanged from v1 (caps)",
+        "author_view": {
+          "lean": "More/Author.lean",
+          "python": "companion/python/more_kernel/author.py",
+          "verdicts": "lean-model/board-author-verdicts.json",
+          "board_additions_register": "more-lean-model.md §12b",
+          "action_shape": {
+            "sourced": [
+              "submitKernel",
+              "lineage",
+              "assertPointer",
+              "endPointer",
+              "requestWorkflowStatus",
+              "registerNode"
+            ],
+            "board_addition": [
+              "registerIssue",
+              "reviseIssueMeta",
+              "setAssignee",
+              "setSchedule",
+              "reorder",
+              "watch",
+              "unwatch",
+              "comment"
+            ]
+          },
+          "actions": [
+            "submitKernel",
+            "lineage",
+            "registerIssue",
+            "registerNode",
+            "reviseIssueMeta",
+            "assertPointer",
+            "endPointer",
+            "setAssignee",
+            "setSchedule",
+            "requestWorkflowStatus",
+            "reorder",
+            "watch",
+            "unwatch",
+            "comment"
+          ],
+          "refusals": [
+            "author_status_hand_set",
+            "author_acceptance_as_status",
+            "board_prerequisite_unmet",
+            "board_schedule_invalid",
+            "board_workflow_status_derived",
+            "author_pointer_invalid",
+            "author_lineage_invalid",
+            "board_dependency_cycle",
+            "author_node_invalid"
+          ],
+          "v1_map": {
+            "create": "registerIssue",
+            "update": "reviseIssueMeta",
+            "move": "requestWorkflowStatus",
+            "reorder": "reorder",
+            "assign": "setAssignee",
+            "relate": "assertPointer",
+            "unrelate": "endPointer",
+            "schedule": "setSchedule",
+            "watch": "watch",
+            "unwatch": "unwatch",
+            "comment": "comment"
+          },
+          "note": "Workflow status is derived (More/Jwf); kernel events use submitKernel. Board-only verbs are §12b additions with provenance in board-author-verdicts.json — do not cite metamodel-kernel.json or SQLite columns as MORe sources. Do not map board depends gate to dor_dependency_unresolved or schedule rules to envelope_invalid. A depends_on cycle is board_dependency_cycle (§12b board-added refusal on the sourced assertPointer), not author_pointer_invalid.",
+          "v1_create_dispatch": "create of a kind in kind_map with kernel_kind hierarchy_node also emits registerNode (More/BoardProjection.lean boardCreate); v1_map stays registerIssue"
+        },
+        "world_model_projection": {
+          "lean": "More/WorldModel.lean",
+          "python": "companion/python/more_kernel/world_model.py",
+          "open_item_reasons": [
+            "decision_open",
+            "dor_violation",
+            "claim_unmet",
+            "challenge_open",
+            "gap_signal_open"
+          ],
+          "challenge": "board projection (M34 file briefs; DISCIPLINE.md)",
+          "gap": "signal-derived (gap-open/gap-closed); not MORe artifact kind",
+          "jwf_index": "per board issue: jwfLevel over the author context's nodes and pointers (More/BoardProjection.lean worldInputsOfCtx, worldModel_jwfIndex_issue)",
+          "board_column": {
+            "lean": "More/BoardProjection.lean boardColumn",
+            "provenance": "board_addition (more-lean-model.md §12b)",
+            "map": {
+              "Neu": "backlog",
+              "Klärung / DoR (other states)": "todo",
+              "Umsetzung / DoD": "in_progress",
+              "Test & Abnahme": "in_progress",
+              "Produktion": "done"
+            },
+            "phases_source": "JWF p.7",
+            "canceled": "never derived"
+          }
+        },
         "views": [
           "list",
           "board",
           "timeline"
         ],
-        "schedule_layers_note": "board-specific; not MORe. Do not name the schedule layer 'baseline' in MORe-facing APIs (clashes with configuration baseline)."
+        "schedule_layers_note": "board-specific; not MORe. Do not name the schedule layer 'baseline' in MORe-facing APIs (clashes with configuration baseline).",
+        "kind_map_hierarchy_note": "Hierarchy kinds (domain..api_spec) are created by v1 create = registerIssue (board row, §12b) + registerNode (sourced; refusal author_node_invalid when the parent rule fails or the id exists). Levels and parent rule are sourced (LEI hierarchy; IA v1.4 §9 p.12; hierarchy.parent). Which levels feed JWF conditions 2 (BP/CM/AC) and 3 (UI/API) is the kernel mapping of More/Jwf.lean (more-lean-model.md §12: 'The mapping is ours'), not source text. task/requirement/decision/test/cutover_step are unchanged; test and decision stay events/pointers, not TC/DEC nodes. Lean: More/BoardProjection.lean boardKindLevel."
       },
-      "duplication_audit": "Cypoe/more-framework@e32e5c3:lean-model/more-lean-model.md §5"
+      "duplication_audit": "see more-lean-model.md §5"
     }
   },
   "notes_v4": {
@@ -1013,6 +1302,38 @@
     }
   },
   "generated_projections": {
+    "lolaplex_board_author_view": {
+      "kind": "projection contract (board UI ↔ Lean author view)",
+      "lean": "More/Author.lean",
+      "python": "companion/python/more_kernel/author.py",
+      "verdicts": "lean-model/board-author-verdicts.json",
+      "board_additions_register": "more-lean-model.md §12b",
+      "violations": [
+        "author_status_hand_set",
+        "author_acceptance_as_status",
+        "board_prerequisite_unmet",
+        "board_schedule_invalid",
+        "board_workflow_status_derived",
+        "author_pointer_invalid",
+        "author_lineage_invalid",
+        "board_dependency_cycle",
+        "author_node_invalid"
+      ],
+      "must_not_reuse_for_board_gates": [
+        {
+          "id": "dor_dependency_unresolved",
+          "lean_meaning": "DoR: depends_on open decision or suspect pointer (Ready.lean)"
+        },
+        {
+          "id": "envelope_invalid",
+          "lean_meaning": "Malformed event envelope (Admit.lean)"
+        },
+        {
+          "id": "author_pointer_invalid",
+          "lean_meaning": "Pointer breaks a relation rule: floating target or missing preserves (Author.lean). A well-formed depends_on pointer that closes a cycle is board_dependency_cycle."
+        }
+      ]
+    },
     "compliance_matrix": {
       "source": "LEI (Compliance Intensiv / Aufbaumodul): map MORe structure to evidence duties of DORA, NIS2, KRITIS-Dachgesetz, MaRisk, ISO 27001 — 'Welche MORe-Ebene liefert welchen Nachweis', DEC 'revisionssicher', result 'eine Mapping-Matrix'",
       "kind": "projection (never hand-kept)",
@@ -1077,7 +1398,7 @@
         ]
       },
       {
-        "phase": "Test & acceptance (JWF: Test & Abnahme)",
+        "phase": "Test & Abnahme",
         "states": [
           "Im fachlichen Test",
           "Test abgeschlossen",
@@ -1162,21 +1483,21 @@
         "BEL §5.2: 'Die Abnahme bezieht sich ausdrücklich auf einen identifizierten Versionsstand.'"
       ]
     },
-    "approval_path": "JWF names one approval: the release / acceptance decision (JWF: Freigabe / Abnahmeentscheidung; p.7 'Fachliche Prüfung und Freigabe'; p.9 'fachliche Abnahme', 'Abnahmeentscheidung'). It is the acceptance decision (jira_status_model.acceptance), which reaches Accepted (JWF state 'Abgenommen') and is the QG3 guard 'freigegeben'. No gate has a further approval step: p.10 lists no decision among the QG guards. Board roles: PO/Fachbereich, Entwicklung, Test/Abnahme, Release/Team (p.9).",
+    "approval_path": "JWF names one approval: the Freigabe / Abnahmeentscheidung (p.7 'Fachliche Prüfung und Freigabe'; p.9 'fachliche Abnahme', 'Abnahmeentscheidung'). It is the acceptance decision (jira_status_model.acceptance), which reaches Abgenommen and is the QG3 guard 'freigegeben'. No gate has a further approval step: p.10 lists no decision among the QG guards. Board roles: PO/Fachbereich, Entwicklung, Test/Abnahme, Release/Team (p.9).",
     "mapping_to_v4": {
       "note": "Jira states are kept as a derived status model (governance_concepts.status_model): each state is a fold over v4 events, never written. Mapping is ours; the deck does not use event vocabulary.",
       "Neu..In technischer Beschreibung": "derived from decision events (selection, open DECs) and authored artifacts",
       "Fertig für Einplanung (=Ready)": "derived: no open decision + QG1 guards held as verification events pinned to subject@v",
       "Fertig für Entwicklung..Fertig zum Testen": "derived from implementation pointers + verification events (technische QS)",
       "Im fachlichen Test / Test abgeschlossen": "verification events pinned to subject@v",
-      "In Abnahme / Abgenommen": "In acceptance (JWF 'In Abnahme') = QG2 held (implements claim met + verified + no open decision). Accepted (JWF 'Abgenommen') = the acceptance decision (jira_status_model.acceptance), a decision event, never a status",
+      "In Abnahme / Abgenommen": "In Abnahme = QG2 held (implements claim met + verified + no open decision). Abgenommen = the acceptance decision (jira_status_model.acceptance), a decision event, never a status",
       "Produktion": "derived_status.done: inclusion into a release (Release zugeordnet) + verified + accepted. Kernel derivation: JWF gives the state no condition; the p.9 Release / Team board lists 'Freigegebene Stände, Release-Zuordnung, Produktionsstatus, offene Nachweise'",
-      "Geschlossen": "Closed (JWF 'Geschlossen'): QG3 held (JWF p.7: 'Produktion / QG 3 ... Produktiver und geschlossener Stand') — acceptance decision + inclusion + production verification pinned to the release baseline (derived_status.proven_in_production); derived terminal fold, no event writes it. Closed implies derived_status.done; done alone is not Closed",
-      "Done": "the deck has no 'Done' state, only DoD as a phase (p.7). Any Jira 'Done' maps to derived_status.done; setting 'Done' or Closed (JWF 'Geschlossen') by hand is status_hand_set"
+      "Geschlossen": "QG3 held (JWF p.7: 'Produktion / QG 3 ... Produktiver und geschlossener Stand'): acceptance decision + inclusion + production verification pinned to the release baseline (derived_status.proven_in_production); derived terminal fold, no event writes it. Geschlossen implies derived_status.done; done alone is not Geschlossen",
+      "Done": "the deck has no 'Done' state, only DoD as a phase (p.7). Any Jira 'Done' maps to derived_status.done; setting 'Done' or 'Geschlossen' by hand is status_hand_set"
     },
     "reflow_cutover": "NOT in JWF. Neither word nor any rescheduling, rollback or cut-over step appears in the 13 pages. The v3 finding stands: reflow has no MORe source; cut-over appears only as BEL §7.3 example domain (UC-COP-011/DEC-COP-001).",
     "kernel_additions": {
-      "note": "rules of the JWF mapping with no source text; kept on purpose (Cypoe/more-framework@e32e5c3:lean-model/more-lean-model.md §12a)",
+      "note": "rules of the JWF mapping with no source text; kept on purpose (more-lean-model.md §12a)",
       "decision.topic": {
         "rule": "a decision event names the question it answers (e.g. 'acceptance_decision'); the kernel reads only acceptance_decision",
         "reason": "without it, any decided decision with an acceptance (e.g. an unrelated PO decision) would count as the acceptance decision",
@@ -1210,5 +1531,34 @@
     "statement": "A quotient map is one equivalence relation; MORe needs a family of purpose-indexed relations: what is indistinguishable for verification is not for acceptance, and differs again for operations/monitoring.",
     "consequence": "preserves[] is indexed by purpose (verification|acceptance|operations); one projection can be valid for one purpose and not another. Relevant to agents-memory quotient-tower SPEC.",
     "boundary": "MP p.7 C.0 / p.10: formal semantics is not part of the MORe core; MORe defines which information, relations, derivations and evidence are kept and each relation's evidence claim."
+  },
+  "purpose_register": {
+    "rule": "closed calculus, open for registration (ruling C21, Fabian, 2026-10-27). The sourced purposes are closed. Any other purpose counts only with a register entry that carries typed provenance. An entry adds no relation type, event kind or violation id; it only names the invariants that preserves[] is checked against.",
+    "sourced": [
+      {"key": "verification", "src": "MP p.8 (C.1)"},
+      {"key": "acceptance", "src": "MP p.8 (C.1)"},
+      {"key": "operations", "src": "MP p.8 (C.1) 'Betrieb und Monitoring'"}
+    ],
+    "domain": "not opened: the kernel has no Domain type; the domain (Fachgebiet) is a fixed hierarchy level (IA v1.4 §9)",
+    "entry_fields": {
+      "key": "unique; must not equal a sourced key",
+      "meaning": "what 'preserved' means for this purpose",
+      "invariants": "non-empty list of invariant names checked against preserves[]",
+      "provenance": "typed: {kind: sourced, src} or {kind: profile_addition, profile, src, ruling}",
+      "approval": "{status: pending, what} until Fabian approves the names; then {status: approved, by, date}"
+    },
+    "profiles": {
+      "agents_design": {
+        "note": "agents-design's merged purpose list (calculus §8.2) is render, interaction, accessibility, theming, docs, acceptance, operations, with verification to be added (ruling C21). acceptance, operations and verification are sourced. Ruling C21 Q6 drops docs: prose specs are sources and generated documentation is a projection (core_primitives.derivative.documentation_split). Manuals are derivatives, and their purpose is the entry manual. The entries are render, interaction, accessibility, theming and manual; all are pending Fabian's approval (approval.status).",
+        "entries": [
+          {"key": "render", "invariants": ["element_tree", "resolved_token_values"], "provenance": {"kind": "profile_addition", "profile": "agents-design", "src": "Lolaplex/agents-design PR #4 docs/2026-10-27-calculus.md §8.2 @36495f9", "ruling": "C14, C21 (Fabian, 2026-10-27)"}, "approval": {"status": "approved", "by": "Fabian Schindler", "date": "2026-10-27", "note": "invariant names chosen by us, approved by Fabian (t218u)"}},
+          {"key": "interaction", "invariants": ["client_transitions"], "provenance": {"kind": "profile_addition", "profile": "agents-design", "src": "Lolaplex/agents-design PR #4 docs/2026-10-27-calculus.md §8.2 @36495f9", "ruling": "C14, C21 (Fabian, 2026-10-27)"}, "approval": {"status": "approved", "by": "Fabian Schindler", "date": "2026-10-27", "note": "invariant names chosen by us, approved by Fabian (t218u)"}},
+          {"key": "accessibility", "invariants": ["name_role_value", "target_size", "contrast", "reading_order"], "provenance": {"kind": "profile_addition", "profile": "agents-design", "src": "Lolaplex/agents-design PR #4 docs/2026-10-27-calculus.md §8.2 @36495f9", "ruling": "C14, C21 (Fabian, 2026-10-27)"}, "approval": {"status": "approved", "by": "Fabian Schindler", "date": "2026-10-27", "note": "invariant names chosen by us, approved by Fabian (t218u)"}},
+          {"key": "theming", "invariants": ["theme_permutations_selectable"], "provenance": {"kind": "profile_addition", "profile": "agents-design", "src": "Lolaplex/agents-design PR #4 docs/2026-10-27-calculus.md §8.2 @36495f9", "ruling": "C14, C21 (Fabian, 2026-10-27)"}, "approval": {"status": "approved", "by": "Fabian Schindler", "date": "2026-10-27", "note": "invariant names chosen by us, approved by Fabian (t218u)"}},
+          {"key": "manual", "invariants": ["stable_ids", "procedure_path"], "provenance": {"kind": "profile_addition", "profile": "agents-design", "src": "Lolaplex/agents-design PR #4 docs/2026-10-27-calculus.md §10.3 [Proposal] and §8.2 (docs row: 'so manuals can point at them') @36495f9", "ruling": "C21 Q6 manuals are derivatives, generated or authored (Fabian, 2026-10-27); purpose name and invariants approved by Fabian, 2026-10-27"}, "approval": {"status": "approved", "by": "Fabian Schindler", "date": "2026-10-27", "note": "entry name and invariant names approved by Fabian (t218u); a manual may be generated or authored; agents-design proposes the name manual (calculus §10.3); no MORe source names a purpose for manuals (searched MP C.1, BEL §5, IA §6 and §14.3, US §8, ELSTER §6)"}}
+        ]
+      }
+    },
+    "render_vs_verification": "They overlap in how they are checked, not in what they preserve. In MP, verification is a purpose: which representations are indistinguishable for verification (MP p.8 C.1). MP does not list its invariants. MP B.2 names the invariants of an ELSTER field rule (Wertebereich, Pflicht/Optionalitaet, Kardinalitaet, Abhaengigkeitsbedingung), 'maschinell gegen XSD, Validator und Testabdeckung pruefbar', and the default profile assigns them to verification (a profile choice). render (agents-design calculus §8.2) preserves the element tree and the resolved token values of the output. The two invariant sets differ, and an output can keep one and drop the other, so render is neither verification nor a sub-case of it. The overlap: render, like the field rules, is checked by tests on the output, so its evidence is a verification event (stage test). That is the event kind, not the purpose. Keep both purposes, and do not read the purpose verification as anything checked by a verification event."
   }
 }
