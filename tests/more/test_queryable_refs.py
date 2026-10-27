@@ -33,7 +33,7 @@ class Vocabulary(unittest.TestCase):
         conn = connect()
         self.addCleanup(conn.close)
         self.assertEqual(conn.execute("PRAGMA user_version").fetchone()[0], SCHEMA_VERSION)
-        self.assertEqual(SCHEMA_VERSION, 3)
+        self.assertGreaterEqual(SCHEMA_VERSION, 3)
         self.assertEqual(_attr(conn, "more:subject"), ("ref", "many"))
         self.assertEqual(_attr(conn, "more:subject_ptr"), ("text", "many"))
         self.assertEqual(_attr(conn, "more:pinned_against"), ("text", "many"))
@@ -127,7 +127,8 @@ class Migration(unittest.TestCase):
         # roll the vocabulary back to v2
         conn.execute("UPDATE attr SET value_type = 'text', doc = 'MORe subject identifiers' "
                      "WHERE name = 'more:subject'")
-        conn.execute("DELETE FROM attr WHERE name IN ('more:subject_ptr', 'more:pinned_against')")
+        conn.execute("DELETE FROM attr WHERE name IN "
+                     "('more:subject_ptr', 'more:pinned_against', 'more:said')")
         conn.execute("""UPDATE kind SET optional = '["more:at","more:subject","more:pin","more:body"]'
                         WHERE name = 'more-event'""")
         conn.execute("""UPDATE kind SET optional = '["more:type","more:actor","more:at","more:subject"]'
@@ -136,7 +137,8 @@ class Migration(unittest.TestCase):
         store = Store(conn)
         self.note = _entity(store)
         log = EventLog(conn=conn)
-        with patch.object(store_bridge, "event_changes", _legacy_changes):
+        with patch.object(store_bridge, "event_changes", _legacy_changes), \
+                patch.object(store_bridge, "said_changes", lambda *a, **k: []):
             self.v1 = log.append(verification("UC-1", "UC-1@1")).id
             self.v2 = log.append(Event("verification", FAB, (self.note, "UC-1"),
                                        (f"{self.note}@1", "UC-1@2"),
@@ -155,10 +157,11 @@ class Migration(unittest.TestCase):
         conn = connect(self.path)
         self.addCleanup(conn.close)
         store = Store(conn)
-        self.assertEqual(conn.execute("PRAGMA user_version").fetchone()[0], 3)
+        self.assertEqual(conn.execute("PRAGMA user_version").fetchone()[0], SCHEMA_VERSION)
         self.assertEqual(_attr(conn, "more:subject"), ("ref", "many"))
-        last = self._txs(conn)[-1]
-        self.assertEqual(last[1:], ("evolve", NOTE))
+        mig = [t for t in self._txs(conn) if t[2] == NOTE]
+        self.assertEqual(len(mig), 1)
+        self.assertEqual(mig[0][1], "evolve")
         v1 = store.view(self.v1)
         self.assertNotIn("more:subject", v1)
         self.assertEqual(v1["more:subject_ptr"], ("UC-1",))

@@ -23,6 +23,7 @@ from agents_store.store import Store
 from .checks import EVENT_MUTATED, Violation, check_event
 from .events import Event
 from .profile import Profile, load_profile
+from .said import event_said
 from .store_bridge import materialize_entity, materialize_lineage, store_backed
 
 SCHEMA = Path(__file__).resolve().parent / "schema.sql"
@@ -109,11 +110,13 @@ class EventLog:
         except BaseException:
             self.conn.execute("ROLLBACK")
             raise
-        return event.with_assigned(id=eid, seq=seq, prev=prev, digest=digest)
+        return event.with_assigned(id=eid, seq=seq, prev=prev, digest=digest,
+                                   said=event_said(event, eid))
 
     def _row(self, row) -> Event:
         seq, eid, envelope, prev, digest = row
-        return Event.from_envelope(json.loads(envelope), id=eid, seq=seq, prev=prev, digest=digest)
+        ev = Event.from_envelope(json.loads(envelope))
+        return ev.with_assigned(id=eid, seq=seq, prev=prev, digest=digest, said=event_said(ev, eid))
 
     def events(self, subject: str | None = None) -> Iterator[Event]:
         if subject is None:

@@ -23,6 +23,7 @@ from agents_store.lineage import record_edge
 from agents_store.store import Store
 
 from .events import Event
+from .said import event_said
 
 
 class StoreWriteRefused(RuntimeError):
@@ -59,6 +60,11 @@ def pinned_changes(event: Event, e: str | None = None) -> list[Change]:
     """pinned_against as datoms, verbatim (artifact@version, commit or
     baseline; same target@version shape as more:pin)."""
     return [Change(e, "more:pinned_against", p) for p in dict.fromkeys(event.pinned_against)]
+
+
+def said_changes(eid: str, event: Event, e: str | None = None) -> list[Change]:
+    """The name -> SAID binding: more:said on the event entity (said.py)."""
+    return [Change(e, "more:said", event_said(event, eid))]
 
 
 def event_changes(event: Event, store: Store | None = None) -> list[Change]:
@@ -101,7 +107,7 @@ def materialize_entity(store: Store, eid: str, event: Event) -> int:
     """Write the entity and datoms for one admitted event (entity id = event
     id) in one transact call. Returns the tx id."""
     result = store.transact(
-        event_changes(event, store),
+        event_changes(event, store) + said_changes(eid, event),
         wrapper=INTERNAL_WRAPPER,
         agent=event.actor,
         op="assert",
