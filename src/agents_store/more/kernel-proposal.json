@@ -324,27 +324,27 @@
       "violations": [
         {
           "id": "copy_diverged",
-          "test": "a copy of artifact content exists outside its home and differs from home@version"
+          "fires_when": "a copy of artifact content exists outside its home and differs from home@version"
         },
         {
           "id": "copy_exists",
-          "test": "a copy exists outside its home at all (even if equal) and is not a declared projection"
+          "fires_when": "a copy exists outside its home at all (even if equal) and is not a declared projection"
         },
         {
           "id": "projection_stale",
-          "test": "projection.sources point at superseded versions"
+          "fires_when": "projection.sources point at superseded versions"
         },
         {
           "id": "projection_hand_edited",
-          "test": "regenerate(projection) != stored output (output_hash mismatch)"
+          "fires_when": "regenerate(projection) != stored output (output_hash mismatch)"
         },
         {
           "id": "projection_drops_preserved",
-          "test": "property listed in 'preserves' differs between source and output"
+          "fires_when": "property listed in 'preserves' differs between source and output"
         },
         {
           "id": "derivative_stale",
-          "test": "a pinned input is superseded: source (IR), generator or profile version (generated); a pinned source version (authored)",
+          "fires_when": "a pinned input is superseded: source (IR), generator or profile version (generated); a pinned source version (authored)",
           "src": "ELSTER §11.2 and Phase E (generated representations are generated again after a spec change); id: kernel naming addition (more-lean-model.md §12c)",
           "applies_to_modes": [
             "generated",
@@ -353,7 +353,7 @@
         },
         {
           "id": "derivative_hand_edited",
-          "test": "the delivered bytes differ from the recorded output_hash",
+          "fires_when": "the delivered bytes differ from the recorded output_hash",
           "src": "ELSTER §10 Phase D 'Manuelle Aenderungen an generierten Artefakten werden im Build erkannt.'; id: kernel naming addition (§12c)",
           "applies_to_modes": [
             "generated"
@@ -361,7 +361,7 @@
         },
         {
           "id": "derivative_drops_preserved",
-          "test": "a (purpose, invariant) pair listed in the derives_from edge's preserves does not hold in the output",
+          "fires_when": "a (purpose, invariant) pair listed in the derives_from edge's preserves does not hold in the output",
           "src": "BEL §5.2.1, §10.2; MP p.6-7 (B.2); id: kernel naming addition (§12c)",
           "applies_to_modes": [
             "generated",
@@ -370,7 +370,7 @@
         },
         {
           "id": "generated_provenance_missing",
-          "test": "a generated output (derivative or projection) does not carry source@version, generator@version and output_hash (derivatives of mode generated; never authored ones)",
+          "fires_when": "a generated output (derivative or projection) does not carry source@version, generator@version and output_hash (derivatives of mode generated; never authored ones)",
           "src": "ELSTER §10 Phase D 'Generierte Dateien erhalten einen Versions- und Herkunftsnachweis.'; one id for derivatives and projections (C21 ruling 3); id: kernel naming addition (§12c)",
           "applies_to_modes": [
             "generated"
@@ -378,7 +378,7 @@
         },
         {
           "id": "authored_provenance_missing",
-          "test": "a derivative of mode authored does not carry its author and at least one pinned source@version",
+          "fires_when": "a derivative of mode authored does not carry its author and at least one pinned source@version",
           "applies_to_modes": [
             "authored"
           ],
@@ -392,15 +392,15 @@
         },
         {
           "id": "pointer_unpinned",
-          "test": "non-nav pointer without target_version"
+          "fires_when": "non-nav pointer without target_version"
         },
         {
           "id": "pointer_dangling",
-          "test": "target id/version does not exist"
+          "fires_when": "target id/version does not exist"
         },
         {
           "id": "pointer_suspect",
-          "test": "target superseded since pointer was confirmed"
+          "fires_when": "target superseded since pointer was confirmed"
         }
       ],
       "maps_to_source_drift_kinds": {
