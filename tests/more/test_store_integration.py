@@ -30,7 +30,10 @@ class StoreBackedLog(unittest.TestCase):
         view = self.store.view(ev.id)
         self.assertEqual(view["more:type"], "verification")
         self.assertEqual(view["more:actor"], ev.actor)
-        self.assertIn("RULE-1", view["more:subject"])
+        # RULE-1 is not a store entity: it is kept as a pointer, not a ref
+        self.assertEqual(view["more:subject_ptr"], ("RULE-1",))
+        self.assertNotIn("more:subject", view)
+        self.assertEqual(view["more:pinned_against"], ("RULE-1@1",))
         pin = view["more:pin"]
         self.assertEqual(len(pin), 1)
         self.assertRegex(pin[0], rf"^{ev.id}@\d+$")
@@ -110,12 +113,13 @@ class StoreBackedLog(unittest.TestCase):
         self.assertEqual({d.tx for d in hist}, {tx_id})
         attrs = {d.a for d in hist}
         self.assertEqual(attrs, {"more:type", "more:actor", "more:at", "more:body",
-                                 "more:subject", "more:pin", "title", "body", "more:topic"})
+                                 "more:subject_ptr", "more:pinned_against", "more:pin",
+                                 "title", "body", "more:topic"})
         self.assertEqual(self.store.view(ev.id)["more:pin"], (f"{ev.id}@{tx_id}",))
 
     def test_store_refusal_rolls_back_whole_event(self):
         real = store_bridge.event_changes
-        bad = lambda ev: real(ev) + [Change(None, "no:such-attr", "x")]
+        bad = lambda ev, store=None: real(ev, store) + [Change(None, "no:such-attr", "x")]
         with patch.object(store_bridge, "event_changes", bad):
             with self.assertRaises(StoreWriteRefused):
                 self.log.append(verification("RULE-1", "RULE-1@1"))
