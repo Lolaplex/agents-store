@@ -11,6 +11,7 @@ ValueType = Literal["text", "instant", "int", "bool", "ref", "json"]
 Cardinality = Literal["one", "many"]
 TxOp = Literal["assert", "evolve", "split", "merge", "correct", "retire"]
 CapabilityMode = Literal["render", "lens"]
+ViolationSeverity = Literal["refusal", "diagnostic"]
 
 # An entity as a wrapper sees it: attr name -> value (cardinality 'many' -> tuple of values).
 EntityView = Mapping[str, Any]
@@ -102,6 +103,28 @@ class Capability(Protocol):
     mode: CapabilityMode
 
     def run(self, value: Any, ctx: Mapping[str, Any]) -> Any: ...
+
+
+@dataclass(frozen=True)
+class DomainViolationId:
+    """A domain-owned violation or diagnostic id, registered in the open registrar.
+
+    Kernel ids from the vendored kernel-proposal.json are reserved: a domain
+    must not register one. The owning domain registers its own ids (entry point
+    or in-process); agents-store does not hard-code them.
+
+    Fields:
+      id: stable snake_case id (the public contract).
+      domain: owning domain (for example "agents-design.template-engine").
+      severity: "refusal" (blocks) or "diagnostic" (loud, recorded, does not block).
+      source: provenance reference (doc path, pin, URL, or SAID).
+      test: when it fires; English user-facing text, ASD-STE100.
+    """
+    id: str
+    domain: str
+    severity: ViolationSeverity
+    source: str
+    test: str = ""
 
 
 @dataclass(frozen=True)

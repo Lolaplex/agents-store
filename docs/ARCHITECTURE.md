@@ -79,12 +79,40 @@ History queries walk `datom` by entity/tx; `v_current` is always derivable.
 ## Extension points
 
 1. `Registry` (`registry.py`): in-process registration, or entry-point groups
-   `agents_store.wrappers` / `agents_store.capabilities` in an external package.
+   in an external package:
+   - `agents_store.wrappers` — Wrapper factories
+   - `agents_store.capabilities` — Capability factories
+   - `agents_store.violation_ids` — DomainViolationId factories
+   Two registrants of the same id are a loud collision, never a silent
+   overwrite. Kernel violation ids from the vendored
+   `more/kernel-proposal.json` are reserved: a domain must not register one
+   (see "Domain violation ids" below).
 2. New attrs: wrapper seeds its `ns:*` attrs in `attrs()`; core vocabulary in
    `seed.sql` only (contract change).
 3. New kind: `kind` row (JSON required/optional/derivations).
 4. GPL boundary: Radicale plugin lives in `plugins/radicale_agents_store/`,
    licensed GPLv3, depends on this MIT core — never the reverse.
+
+## Domain violation ids
+
+Domains that are not product-management (MORe / more-framework) register their
+own violation and diagnostic ids here. Examples: a template engine's
+`prose_string_missing` (refusal) or `prose_language_fallback` (diagnostic).
+
+Shape (`contracts.DomainViolationId`):
+
+| Field | Meaning |
+|---|---|
+| `id` | Stable snake_case id (the public contract). |
+| `domain` | Owning domain (for example `agents-design.template-engine`). |
+| `severity` | `refusal` (blocks) or `diagnostic` (loud, recorded, does not block). |
+| `source` | Provenance reference (doc path, pin, URL, or SAID). |
+| `test` | When it fires. English user-facing text follows ASD-STE100. |
+
+The owning domain registers the id (entry point or in-process). This package
+does not hard-code domain ids and leaves the entry-point group empty — the
+same pattern as wrappers and capabilities. MORe kernel ids stay in
+`kernel-proposal.json` and the companion; they are not re-registered here.
 
 ## What this is NOT (POC scope)
 

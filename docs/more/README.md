@@ -208,3 +208,13 @@ signed and establish no key state.
 
 - Board UI projection of JWF / work-item state from store-backed logs
 - CLI/MCP surface for MORe append (T18)
+
+## Domain violation ids (open registrar)
+
+MORe kernel violation ids live in `kernel-proposal.json` and the companion
+checks. Domain-specific ids (for example a template engine's
+`prose_string_missing`) are **not** added to more-framework. They register in
+the store's open registrar: entry-point group `agents_store.violation_ids`,
+type `DomainViolationId` (`contracts.py`), collision rules in `registry.py`.
+A domain id that matches a kernel id is refused. The owning domain registers
+its ids; this package does not ship first-party domain ids in that group.
