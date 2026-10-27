@@ -10,7 +10,7 @@ import json
 import sqlite3
 from dataclasses import dataclass
 
-from .contracts import Derivation, KindSpec
+from .contracts import GapFill, KindSpec
 from .store import Store
 
 
@@ -19,7 +19,7 @@ def _kind_specs(conn: sqlite3.Connection) -> list[KindSpec]:
     out = []
     for name, required, optional, derivations in rows:
         derivs = tuple(
-            Derivation(attr=d["attr"], from_attrs=tuple(d["from"]), rule=d["rule"])
+            GapFill(attr=d["attr"], from_attrs=tuple(d["from"]), rule=d["rule"])
             for d in json.loads(derivations)
         )
         out.append(
