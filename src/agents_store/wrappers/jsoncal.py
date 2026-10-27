@@ -22,7 +22,7 @@ import json
 from datetime import datetime
 from typing import Any, Mapping
 
-from ..contracts import AttrSpec, Change, PutResult, Refusal
+from ..contracts import AttrSpec, Change, PutResult, WriteRefusal
 
 _KEYS = ("uid", "summary", "dtstart", "dtend", "status")
 _KEY_TO_ATTR = {
@@ -78,10 +78,10 @@ class JsoncalWrapper:
         try:
             item = json.loads(rep)
         except ValueError as f:
-            return PutResult(refusals=(Refusal("jcal", "parse_fail", e=e, payload=str(f)),))
+            return PutResult(refusals=(WriteRefusal("jcal", "parse_fail", e=e, payload=str(f)),))
         if not isinstance(item, dict):
             return PutResult(refusals=(
-                Refusal("jcal", "parse_fail", e=e, payload="item is not a JSON object"),))
+                WriteRefusal("jcal", "parse_fail", e=e, payload="item is not a JSON object"),))
         v = view or {}
         uid = item.get("uid")
         cur_uid = v.get("jcal:uid")
@@ -89,7 +89,7 @@ class JsoncalWrapper:
             val = item.get(key)
             if val is not None and not _is_utc_instant(val):
                 return PutResult(refusals=(
-                    Refusal("jcal", "tz_unsupported", e=e, a=_KEY_TO_ATTR[key],
+                    WriteRefusal("jcal", "tz_unsupported", e=e, a=_KEY_TO_ATTR[key],
                             payload=str(val)),))
 
         changes: list[Change] = []

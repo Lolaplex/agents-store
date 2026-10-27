@@ -32,7 +32,7 @@ from agents_store.adapters import folder
 from agents_store.capabilities.entity_html import EntityHtml
 from agents_store.capabilities.markdown_html import MarkdownHtml
 from agents_store.certify import certify, grant_roundtrip
-from agents_store.contracts import Refusal
+from agents_store.contracts import WriteRefusal
 from agents_store.lineage import split
 from agents_store.mediator import Artifact, wrapper_capability
 from agents_store.pane import render, targets

@@ -4,7 +4,7 @@ import unittest
 from unittest.mock import patch
 
 from agents_store import connect
-from agents_store.contracts import Change, Refusal
+from agents_store.contracts import Change, WriteRefusal
 from agents_store.more import store_bridge
 from agents_store.more.store_bridge import StoreWriteRefused
 from agents_store.more.events import Event
@@ -88,7 +88,7 @@ class StoreBackedLog(unittest.TestCase):
         self.assertEqual(edge[0], "wasRevisionOf")
 
     def test_store_refusal_independent_of_more_refusal(self):
-        self.store.record_refusal(Refusal(wrapper="t", reason="probe"))
+        self.store.record_refusal(WriteRefusal(wrapper="t", reason="probe"))
         with self.assertRaises(Refused):
             self.log.append(Event("status", FAB, ("UC-1",), ("UC-1@1",), body={"to": "x"}))
         self.assertEqual(self.conn.execute("SELECT COUNT(*) FROM refusal").fetchone()[0], 1)

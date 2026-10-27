@@ -60,7 +60,11 @@ class Change:
 
 
 @dataclass(frozen=True)
-class Refusal:
+class WriteRefusal:
+    """Wrapper/store denied write. Distinct from MORe Violation and DomainViolationId.
+
+    See docs/ARCHITECTURE.md "Three refusal layers".
+    """
     wrapper: str
     reason: str
     e: str | None = None
@@ -71,7 +75,7 @@ class Refusal:
 @dataclass(frozen=True)
 class PutResult:
     changes: tuple[Change, ...] = ()
-    refusals: tuple[Refusal, ...] = ()
+    refusals: tuple[WriteRefusal, ...] = ()
 
 
 @runtime_checkable

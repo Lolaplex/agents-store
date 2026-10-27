@@ -6,7 +6,7 @@ membership is a view over canonical attrs; arbitrary collections are
 refused. Item identity: `ical:href` is the projection path datum
 (never the entity id); UID in emitted items is always the entity id.
 
-Refusal law: every wrapper/store refusal lands in `refusal` AND surfaces
+WriteRefusal law: every wrapper/store refusal lands in `refusal` AND surfaces
 as an HTTP error (ValueError -> Radicale BAD_REQUEST / conflict).
 """
 from __future__ import annotations
@@ -26,7 +26,7 @@ from radicale.storage import BaseCollection, BaseStorage
 
 import agents_store
 from agents_store.certify import certify, grant_roundtrip, register_wrapper
-from agents_store.contracts import Change, Refusal
+from agents_store.contracts import Change, WriteRefusal
 from agents_store.grant import is_writable
 from agents_store.store import Store
 from agents_store.wrappers.ical import ICalWrapper
@@ -300,7 +300,7 @@ class Collection(BaseCollection):
         for c in res.changes:
             (keep if c.a in allowed else dropped).append(c)
         for c in dropped:
-            store.record_refusal(Refusal(
+            store.record_refusal(WriteRefusal(
                 wrapper="ical", reason="out_of_projection", e=e, a=c.a,
                 payload=f"{self._collection_name} cannot write {c.a} "
                         f"({'retract' if not c.added else c.v})"))

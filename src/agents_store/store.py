@@ -23,7 +23,7 @@ from dataclasses import dataclass
 from typing import Any, Callable, Iterable, Sequence
 
 from . import ids
-from .contracts import Change, Datom, Refusal, TxOp
+from .contracts import Change, Datom, WriteRefusal, TxOp
 from .grant import is_writable
 
 
@@ -33,7 +33,7 @@ class TxResult:
     tx: int
     entity: str | None           # minted id if this call created one
     applied: tuple[Datom, ...]   # datoms written (includes auto-retractions)
-    refusals: tuple[Refusal, ...]
+    refusals: tuple[WriteRefusal, ...]
 
 
 def _encode(value_type: str, v: Any) -> str:
@@ -83,7 +83,7 @@ class Store:
             raise ValueError("transact: tx_changes is reserved for the internal authority")
         if entity is not None and self._exists(entity):
             raise ValueError(f"transact: entity {entity!r} already exists")
-        refusals: list[Refusal] = []
+        refusals: list[WriteRefusal] = []
         mediated: set[int] = set()
         planned: list[tuple[Change, str]] = []
         for ch in changes:
@@ -126,7 +126,7 @@ class Store:
                 refusals.append(self._refuse(wrapper, e, ch.a, "unknown_entity", ch.v))
                 continue
             outcome = self._apply(e, ch, tx_id, ch_wrapper)
-            if isinstance(outcome, Refusal):
+            if isinstance(outcome, WriteRefusal):
                 refusals.append(outcome)
             else:
                 applied.extend(outcome)
@@ -141,7 +141,7 @@ class Store:
                 self._deriving = False
         return TxResult(tx=tx_id, entity=minted, applied=tuple(applied), refusals=tuple(refusals))
 
-    def _apply(self, e: str, ch: Change, tx_id: int, wrapper: str) -> list[Datom] | Refusal:
+    def _apply(self, e: str, ch: Change, tx_id: int, wrapper: str) -> list[Datom] | WriteRefusal:
         spec = self._spec(ch.a)
         if spec is None:
             return self._refuse(wrapper, e, ch.a, "unknown_attr", ch.v)
@@ -172,14 +172,14 @@ class Store:
             (e, a, v, tx_id, 1 if added else 0),
         )
 
-    def _refuse(self, wrapper: str, e: str | None, a: str | None, reason: str, payload: Any) -> Refusal:
+    def _refuse(self, wrapper: str, e: str | None, a: str | None, reason: str, payload: Any) -> WriteRefusal:
         self.conn.execute(
             "INSERT INTO refusal (wrapper, entity, attr, reason, payload) VALUES (?, ?, ?, ?, ?)",
             (wrapper, e, a, reason, None if payload is None else str(payload)),
         )
-        return Refusal(wrapper=wrapper, reason=reason, e=e, a=a, payload=str(payload))
+        return WriteRefusal(wrapper=wrapper, reason=reason, e=e, a=a, payload=str(payload))
 
-    def record_refusal(self, r: Refusal) -> Refusal:
+    def record_refusal(self, r: WriteRefusal) -> WriteRefusal:
         """Persist a wrapper-level refusal (parse/type rejections produced by
         put() before transact ever runs) so every refusal is recorded."""
         return self._refuse(r.wrapper, r.e, r.a, r.reason, r.payload)
@@ -206,7 +206,7 @@ class Store:
         ).fetchall()
         return [Datom(e, a, self._decode_by_attr(a, v), tx, bool(added)) for a, v, tx, added in rows]
 
-    def refusals(self, e: str | None = None) -> list[Refusal]:
+    def refusals(self, e: str | None = None) -> list[WriteRefusal]:
         if e is None:
             rows = self.conn.execute(
                 "SELECT wrapper, entity, attr, reason, payload FROM refusal ORDER BY id"
@@ -216,7 +216,7 @@ class Store:
                 "SELECT wrapper, entity, attr, reason, payload FROM refusal WHERE entity = ? ORDER BY id",
                 (e,),
             ).fetchall()
-        return [Refusal(wrapper=w, reason=r, e=ent, a=a, payload=p) for w, ent, a, r, p in rows]
+        return [WriteRefusal(wrapper=w, reason=r, e=ent, a=a, payload=p) for w, ent, a, r, p in rows]
 
     def exists(self, e: str) -> bool:
         return self._exists(e)

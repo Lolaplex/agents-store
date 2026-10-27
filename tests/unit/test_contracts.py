@@ -3,7 +3,7 @@ import unittest
 from dataclasses import FrozenInstanceError
 
 from agents_store import (
-    Capability, Change, Datom, PutResult, Refusal, Wrapper,
+    Capability, Change, Datom, PutResult, WriteRefusal, Wrapper,
 )
 
 
@@ -23,7 +23,7 @@ class TestContracts(unittest.TestCase):
         self.assertEqual(r.refusals, ())
 
     def test_refusal_fields(self):
-        r = Refusal(wrapper="md", reason="no_grant", e="e1", a="body")
+        r = WriteRefusal(wrapper="md", reason="no_grant", e="e1", a="body")
         self.assertEqual(r.reason, "no_grant")
 
     def test_protocol_is_runtime_checkable(self):

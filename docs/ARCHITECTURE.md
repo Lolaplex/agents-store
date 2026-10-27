@@ -18,7 +18,7 @@ A **Wrapper** (`contracts.Wrapper`) is a pure lens over text: `get(e, view) -> s
 `put(rep, e, view) -> PutResult{changes, refusals}`. Put never writes; it
 *proposes* `Change`s. The store decides whether each proposed attr is writable
 (rule: a `grant_` row backed by a passing `certificate`), and logs every
-rejected proposal in `refusal`. Adapters (folder watcher, Radicale plugin) do
+rejected proposal as a `WriteRefusal` in `refusal`. Adapters (folder watcher, Radicale plugin) do
 the I/O and call wrapper + store — protocol code never lives in wrappers.
 
 A **Capability** is one interpretation step `in_kind -> out_kind`
@@ -92,6 +92,29 @@ History queries walk `datom` by entity/tx; `v_current` is always derivable.
 3. New kind: `kind` row (JSON required/optional/derivations).
 4. GPL boundary: Radicale plugin lives in `plugins/radicale_agents_store/`,
    licensed GPLv3, depends on this MIT core — never the reverse.
+
+## Three refusal layers
+
+Three distinct types share the everyday word "refusal". Do not conflate them:
+
+1. **Wrapper `WriteRefusal`** (`contracts.WriteRefusal`) — a denied *write proposal*
+   from a wrapper, adapter, pane, or the store's grant check. Landed in the
+   `refusal` table with a snake_case `reason` id (`parse_fail`, `no_grant`,
+   `out_of_projection`, …). The write path is default-deny; every rejected
+   change is recorded and returned on `PutResult.refusals` / `TxResult.refusals`.
+
+2. **MORe `Violation`** (`more.checks.Violation`) — a kernel/companion check
+   failure against an admitted event (status hand-set, overrule without signal,
+   …). Recorded in `more_refusal` when the event log refuses to admit. Severity
+   here is inherent to the kernel id (the check failed).
+
+3. **`DomainViolationId.severity`** — an open-registrar id owned by a domain
+   (not MORe). Severity is `refusal` (blocks) or `warning` (loud, recorded, does
+   not block). Kernel ids from `kernel-proposal.json` are reserved and are not
+   re-registered here.
+
+The table `refusal` stores layer 1 only. Layer 2 uses `more_refusal`. Layer 3
+is registry metadata, not a row type.
 
 ## Domain violation ids
 

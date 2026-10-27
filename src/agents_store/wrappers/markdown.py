@@ -22,7 +22,7 @@ from __future__ import annotations
 import json
 from typing import Any, Mapping
 
-from ..contracts import AttrSpec, Change, PutResult, Refusal
+from ..contracts import AttrSpec, Change, PutResult, WriteRefusal
 
 CORE_KEYS = ("title", "status", "when", "end")
 RESERVED = frozenset({"id", "body", *CORE_KEYS})
@@ -68,11 +68,11 @@ class MarkdownWrapper:
         try:
             fm, body = _parse(rep)
         except _ParseFail as f:
-            return PutResult(refusals=(Refusal("md", "parse_fail", e=e, payload=str(f)),))
+            return PutResult(refusals=(WriteRefusal("md", "parse_fail", e=e, payload=str(f)),))
         fid = fm.get("id")
         if e is not None and fid is not None and fid != e:
             return PutResult(refusals=(
-                Refusal("md", "id_mismatch", e=e, payload=f"file id {fid} != {e}"),))
+                WriteRefusal("md", "id_mismatch", e=e, payload=f"file id {fid} != {e}"),))
         te = e or fid
         v = view or {}
         changes: list[Change] = []

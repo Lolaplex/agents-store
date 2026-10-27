@@ -25,7 +25,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-from ..contracts import Change, Refusal
+from ..contracts import Change, WriteRefusal
 from ..store import Store
 from ..wrappers.jsoncal import JsoncalWrapper
 
@@ -36,15 +36,15 @@ class SyncReport:
     created: int = 0
     written: bool = False
     tx_count: int = 0
-    refusals: list[Refusal] = field(default_factory=list)
+    refusals: list[WriteRefusal] = field(default_factory=list)
 
 
-def _refuse(store: Store, reason: str, e=None, a=None, payload=None) -> Refusal:
+def _refuse(store: Store, reason: str, e=None, a=None, payload=None) -> WriteRefusal:
     store.conn.execute(
         "INSERT INTO refusal (wrapper, entity, attr, reason, payload) VALUES (?,?,?,?,?)",
         ("jcal", e, a, reason, None if payload is None else str(payload)),
     )
-    return Refusal(wrapper="jcal", reason=reason, e=e, a=a,
+    return WriteRefusal(wrapper="jcal", reason=reason, e=e, a=a,
                    payload=None if payload is None else str(payload))
 
 

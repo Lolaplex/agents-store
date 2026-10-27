@@ -1,4 +1,4 @@
-"""Schema v5: Refusal.reason kebab -> snake, idempotent one-shot."""
+"""Schema v5: WriteRefusal.reason kebab -> snake, idempotent one-shot."""
 from __future__ import annotations
 
 import os
@@ -109,7 +109,7 @@ class TestRefusalReasonMigrate(unittest.TestCase):
         self.addCleanup(conn.close)
         store = Store(conn)
         store.record_refusal(
-            __import__("agents_store", fromlist=["Refusal"]).Refusal(
+            __import__("agents_store", fromlist=["WriteRefusal"]).WriteRefusal(
                 wrapper="md", reason="parse_fail", e="n1"
             )
         )

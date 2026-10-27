@@ -17,7 +17,7 @@ from __future__ import annotations
 
 import sqlite3
 
-from agents_store.contracts import Change, Refusal
+from agents_store.contracts import Change, WriteRefusal
 from agents_store.grant import INTERNAL_WRAPPER
 from agents_store.lineage import record_edge
 from agents_store.store import Store
@@ -31,7 +31,7 @@ class StoreWriteRefused(RuntimeError):
     """transact refused part of an event's datoms. The event must not be
     admitted half-materialized, so the caller rolls the whole append back."""
 
-    def __init__(self, refusals: tuple[Refusal, ...]):
+    def __init__(self, refusals: tuple[WriteRefusal, ...]):
         self.refusals = refusals
         super().__init__("; ".join(f"{r.a}: {r.reason}" for r in refusals))
 
@@ -45,7 +45,7 @@ def assert_canonical_numbers(event: Event) -> None:
     issues = number_issues(event.envelope())
     if issues:
         raise StoreWriteRefused(tuple(
-            Refusal(INTERNAL_WRAPPER, i.reason, a=i.path.split(".")[1].split("[")[0],
+            WriteRefusal(INTERNAL_WRAPPER, i.reason, a=i.path.split(".")[1].split("[")[0],
                     payload=i.path)
             for i in issues))
 
