@@ -1,15 +1,16 @@
 """agents-store: one identity, many lawful projections."""
 from .contracts import (
-    AttrSpec, Capability, CapabilityPath, Change, Datom, Derivation, KindSpec,
-    PutResult, Refusal, Wrapper,
+    AttrSpec, Capability, CapabilityPath, Change, Datom, Derivation,
+    DomainViolationId, KindSpec, PutResult, Refusal, Wrapper,
 )
 from .db import connect
-from .registry import Registry, RegistryError
+from .registry import Registry, RegistryError, kernel_violation_ids
 
 __version__ = "0.0.1"
 
 __all__ = [
     "AttrSpec", "Capability", "CapabilityPath", "Change", "Datom", "Derivation",
-    "KindSpec", "PutResult", "Refusal", "Wrapper", "connect", "Registry",
-    "RegistryError", "__version__",
+    "DomainViolationId", "KindSpec", "PutResult", "Refusal", "Wrapper",
+    "connect", "Registry", "RegistryError", "kernel_violation_ids",
+    "__version__",
 ]
