@@ -11,7 +11,7 @@ ValueType = Literal["text", "instant", "int", "bool", "ref", "json"]
 Cardinality = Literal["one", "many"]
 TxOp = Literal["assert", "evolve", "split", "merge", "correct", "retire"]
 CapabilityMode = Literal["render", "lens"]
-ViolationSeverity = Literal["refusal", "diagnostic"]
+ViolationSeverity = Literal["refusal", "warning"]
 
 # An entity as a wrapper sees it: attr name -> value (cardinality 'many' -> tuple of values).
 EntityView = Mapping[str, Any]
@@ -107,7 +107,7 @@ class Capability(Protocol):
 
 @dataclass(frozen=True)
 class DomainViolationId:
-    """A domain-owned violation or diagnostic id, registered in the open registrar.
+    """A domain-owned violation or warning id, registered in the open registrar.
 
     Kernel ids from the vendored kernel-proposal.json are reserved: a domain
     must not register one. The owning domain registers its own ids (entry point
@@ -116,15 +116,15 @@ class DomainViolationId:
     Fields:
       id: stable snake_case id (the public contract).
       domain: owning domain (for example "agents-design.template-engine").
-      severity: "refusal" (blocks) or "diagnostic" (loud, recorded, does not block).
-      source: provenance reference (doc path, pin, URL, or SAID).
-      when: English text that says when the id fires (ASD-STE100).
+      severity: "refusal" (blocks) or "warning" (loud, recorded, does not block).
+      provenance_ref: provenance reference (doc path, pin, URL, or SAID).
+      fires_when: English text that says when the id fires (ASD-STE100).
     """
     id: str
     domain: str
     severity: ViolationSeverity
-    source: str
-    when: str = ""
+    provenance_ref: str
+    fires_when: str = ""
 
 
 @dataclass(frozen=True)

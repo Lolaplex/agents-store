@@ -96,8 +96,8 @@ History queries walk `datom` by entity/tx; `v_current` is always derivable.
 ## Domain violation ids
 
 Domains that are not product-management (MORe / more-framework) register their
-own violation and diagnostic ids here. Examples: a template engine's
-`prose_string_missing` (refusal) or `prose_language_fallback` (diagnostic).
+own violation and warning ids here. Examples: a template engine's
+`prose_string_missing` (refusal) or `prose_language_fallback` (warning).
 
 Shape (`contracts.DomainViolationId`):
 
@@ -105,9 +105,9 @@ Shape (`contracts.DomainViolationId`):
 |---|---|
 | `id` | Stable snake_case id (the public contract). |
 | `domain` | Owning domain (for example `agents-design.template-engine`). |
-| `severity` | `refusal` (blocks) or `diagnostic` (loud, recorded, does not block). |
-| `source` | Provenance reference (doc path, pin, URL, or SAID). |
-| `when` | English text that says when the id fires (ASD-STE100). |
+| `severity` | `refusal` (blocks) or `warning` (loud, recorded, does not block). |
+| `provenance_ref` | Provenance reference (doc path, pin, URL, or SAID). |
+| `fires_when` | English text that says when the id fires (ASD-STE100). |
 
 The owning domain registers the id (entry point or in-process). This package
 does not hard-code domain ids and leaves the entry-point group empty — the

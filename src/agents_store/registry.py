@@ -32,7 +32,7 @@ _KERNEL_ID_LIST_KEYS = (
     "refusals",
     "must_not_reuse_for_board_gates",
 )
-_SEVERITIES = frozenset({"refusal", "diagnostic"})
+_SEVERITIES = frozenset({"refusal", "warning"})
 
 
 class RegistryError(ValueError):
@@ -103,11 +103,13 @@ class Registry:
             raise RegistryError("violation id must be a non-empty string")
         if not v.domain or not isinstance(v.domain, str):
             raise RegistryError(f"violation id {v.id!r}: domain is required")
-        if not v.source or not isinstance(v.source, str):
-            raise RegistryError(f"violation id {v.id!r}: source (provenance) is required")
+        if not v.provenance_ref or not isinstance(v.provenance_ref, str):
+            raise RegistryError(
+                f"violation id {v.id!r}: provenance_ref is required"
+            )
         if v.severity not in _SEVERITIES:
             raise RegistryError(
-                f"violation id {v.id!r}: severity must be refusal|diagnostic, "
+                f"violation id {v.id!r}: severity must be refusal|warning, "
                 f"got {v.severity!r}"
             )
         if v.id in kernel_violation_ids():
