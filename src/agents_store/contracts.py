@@ -26,7 +26,7 @@ class AttrSpec:
 
 
 @dataclass(frozen=True)
-class Derivation:
+class GapFill:
     """Declared gap-filling rule. Derived values are shown as derived, never written back."""
     attr: str
     from_attrs: tuple[str, ...]
@@ -38,7 +38,7 @@ class KindSpec:
     name: str
     required: tuple[str, ...]
     optional: tuple[str, ...] = ()
-    derivations: tuple[Derivation, ...] = ()
+    derivations: tuple[GapFill, ...] = ()
 
 
 @dataclass(frozen=True)
