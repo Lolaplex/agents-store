@@ -4,12 +4,14 @@ import unittest
 from unittest.mock import patch
 
 from agents_store import connect
-from agents_store.contracts import Refusal
+from agents_store.contracts import Change, Refusal
+from agents_store.more import store_bridge
+from agents_store.more.store_bridge import StoreWriteRefused
 from agents_store.more.events import Event
 from agents_store.more.log import EventLog, Refused
 from agents_store.more.status import derive
 from agents_store.store import Store
-from tests.more.helpers import FAB, decision, verification
+from tests.more.helpers import FAB, adr, decision, verification
 
 
 class StoreBackedLog(unittest.TestCase):
@@ -88,6 +90,47 @@ class StoreBackedLog(unittest.TestCase):
             self.log.append(Event("status", FAB, ("UC-1",), ("UC-1@1",), body={"to": "x"}))
         self.assertEqual(self.conn.execute("SELECT COUNT(*) FROM refusal").fetchone()[0], 1)
         self.assertEqual(self.conn.execute("SELECT COUNT(*) FROM more_refusal").fetchone()[0], 1)
+
+    def test_writes_go_through_transact_in_one_tx(self):
+        with patch.object(Store, "transact", autospec=True, side_effect=Store.transact) as spy:
+            ev = self.log.append(adr("DEC-9", "DEC-9@1", "Title", "Text", "Which?"))
+        self.assertEqual(spy.call_count, 1)
+        kwargs = spy.call_args.kwargs
+        self.assertEqual(kwargs["entity"], ev.id)
+        self.assertEqual(kwargs["wrapper"], "store")
+        tx = self.conn.execute(
+            "SELECT id, op, agent, wrapper, note FROM tx").fetchall()
+        self.assertEqual(len(tx), 1)
+        tx_id, op, agent, wrapper, note = tx[0]
+        self.assertEqual((op, agent, wrapper, note), ("assert", ev.actor, "store", "more:decision"))
+        created = self.conn.execute(
+            "SELECT created_tx FROM entity WHERE id = ?", (ev.id,)).fetchone()[0]
+        self.assertEqual(created, tx_id)
+        hist = self.store.history(ev.id)
+        self.assertEqual({d.tx for d in hist}, {tx_id})
+        attrs = {d.a for d in hist}
+        self.assertEqual(attrs, {"more:type", "more:actor", "more:at", "more:body",
+                                 "more:subject", "more:pin", "title", "body", "more:topic"})
+        self.assertEqual(self.store.view(ev.id)["more:pin"], (f"{ev.id}@{tx_id}",))
+
+    def test_store_refusal_rolls_back_whole_event(self):
+        real = store_bridge.event_changes
+        bad = lambda ev: real(ev) + [Change(None, "no:such-attr", "x")]
+        with patch.object(store_bridge, "event_changes", bad):
+            with self.assertRaises(StoreWriteRefused):
+                self.log.append(verification("RULE-1", "RULE-1@1"))
+        for table in ("event", "entity", "datom", "tx", "refusal", "more_refusal"):
+            self.assertEqual(
+                self.conn.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0], 0, table)
+
+    def test_lineage_edge_shares_event_tx(self):
+        d = self.log.append(decision("DEC-1", "DEC-1@1", status="open"))
+        sup = self.log.append(Event(
+            "supersession", FAB, ("DEC-1",), ("DEC-1@1",),
+            supersedes=(d.id,), reason="r"))
+        edge_tx = self.conn.execute(
+            "SELECT tx FROM lineage WHERE child = ?", (sup.id,)).fetchone()[0]
+        self.assertEqual({x.tx for x in self.store.history(sup.id)}, {edge_tx})
 
 
 if __name__ == "__main__":

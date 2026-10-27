@@ -6,8 +6,8 @@ envelope). verify() recomputes it, so an edit or removal made below the
 triggers (raw file access) shows up as event_mutated.
 
 When opened on a store database (``entity`` table present), each admitted
-event is also materialized as an entity with the same id in one atomic
-transaction.
+event is also materialized as an entity with the same id through
+Store.transact, in the same atomic SQLite transaction as the event row.
 """
 from __future__ import annotations
 
@@ -18,11 +18,12 @@ from pathlib import Path
 from typing import Iterator
 
 from agents_store.ids import mint
+from agents_store.store import Store
 
 from .checks import EVENT_MUTATED, Violation, check_event
 from .events import Event
 from .profile import Profile, load_profile
-from .store_bridge import materialize_entity, materialize_lineage, open_tx, store_backed
+from .store_bridge import materialize_entity, materialize_lineage, store_backed
 
 SCHEMA = Path(__file__).resolve().parent / "schema.sql"
 
@@ -65,6 +66,7 @@ class EventLog:
             self._owns_conn = True
             _apply_schema(self.conn)
         self._integrated = store_backed(self.conn)
+        self._store = Store(self.conn) if self._integrated else None
 
     def close(self) -> None:
         if self._owns_conn:
@@ -93,8 +95,7 @@ class EventLog:
             digest = _digest(prev, eid, event.canonical())
             tx_id: int | None = None
             if self._integrated:
-                tx_id = open_tx(self.conn, event)
-                materialize_entity(self.conn, eid, tx_id, event)
+                tx_id = materialize_entity(self._store, eid, event)
             seq = self.conn.execute(
                 "INSERT INTO event (id, type, actor, at, envelope, prev, digest) "
                 "VALUES (?, ?, ?, ?, ?, ?, ?)",
@@ -103,7 +104,7 @@ class EventLog:
                 "INSERT INTO event_subject (event_id, subject) VALUES (?, ?)",
                 [(eid, s) for s in dict.fromkeys(event.subjects)])
             if self._integrated and tx_id is not None:
-                materialize_lineage(self.conn, eid, tx_id, event)
+                materialize_lineage(self._store, eid, tx_id, event)
             self.conn.execute("COMMIT")
         except BaseException:
             self.conn.execute("ROLLBACK")

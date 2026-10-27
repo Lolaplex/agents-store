@@ -23,11 +23,17 @@ def _tx(conn, op: str, agent: str | None, reason: str | None) -> int:
     ).lastrowid
 
 
-def _edge(conn, child: str, parent: str, kind: str, tx: int, reason: str | None) -> None:
+def record_edge(conn, child: str, parent: str, kind: str, tx: int, reason: str | None) -> None:
+    """Append one lineage edge under an already-open tx. Lineage edges are
+    not datoms, so they sit beside transact(); callers own the tx and the
+    surrounding transaction."""
     conn.execute(
         "INSERT INTO lineage (child, parent, kind, tx, reason) VALUES (?, ?, ?, ?, ?)",
         (child, parent, kind, tx, reason),
     )
+
+
+_edge = record_edge
 
 
 def split(store: Store, e: str, into: Sequence[Sequence[str]], *, reason: str,

@@ -163,5 +163,39 @@ class TestGrantAPI(unittest.TestCase):
         self.assertFalse(is_writable(self.conn, "test", "status"))
 
 
+class TestTransactPreassignedEntity(unittest.TestCase):
+    """entity= / tx_changes= (used by the MORe store bridge)."""
+
+    def setUp(self):
+        self.conn = connect()
+        self.store = Store(self.conn)
+
+    def test_entity_param_uses_given_id(self):
+        r = self.store.transact([Change(None, "title", "x")], wrapper="store", entity="EID-1")
+        self.assertEqual(r.entity, "EID-1")
+        self.assertEqual(self.store.view("EID-1")["title"], "x")
+        row = self.conn.execute("SELECT created_tx FROM entity WHERE id = 'EID-1'").fetchone()
+        self.assertEqual(row[0], r.tx)
+
+    def test_entity_param_refuses_existing_id(self):
+        self.store.transact([Change(None, "title", "x")], wrapper="store", entity="EID-1")
+        txs = self.conn.execute("SELECT COUNT(*) FROM tx").fetchone()[0]
+        with self.assertRaises(ValueError):
+            self.store.transact([Change(None, "title", "y")], wrapper="store", entity="EID-1")
+        self.assertEqual(self.conn.execute("SELECT COUNT(*) FROM tx").fetchone()[0], txs)
+
+    def test_tx_changes_see_own_tx_and_land_in_it(self):
+        r = self.store.transact(
+            [Change(None, "title", "x")], wrapper="store", entity="EID-2",
+            tx_changes=lambda tx, e: [Change(None, "more:pin", f"{e}@{tx}")])
+        self.assertEqual(self.store.view("EID-2")["more:pin"], (f"EID-2@{r.tx}",))
+        self.assertEqual({d.tx for d in self.store.history("EID-2")}, {r.tx})
+
+    def test_tx_changes_internal_only(self):
+        with self.assertRaises(ValueError):
+            self.store.transact([], wrapper="test", tx_changes=lambda tx, e: [])
+        self.assertEqual(self.conn.execute("SELECT COUNT(*) FROM tx").fetchone()[0], 0)
+
+
 if __name__ == "__main__":
     unittest.main()
