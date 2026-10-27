@@ -14,13 +14,17 @@ Scheme (KERI/CESR, as in keripy ``Saider``):
   one zero lead byte + the 32 raw bytes, the first char replaced by ``E``
   (44 chars, so the second char is always in ``A``-``P``);
 - serialization: KERI style, not JCS. Compact JSON exactly as keripy dumps it
-  (``json.dumps(sad, separators=(",", ":"), ensure_ascii=False)``, UTF-8), in
+  (``json.dumps(sad, separators=(",", ":"), ensure_ascii=False)``, UTF-8,
+  with ``allow_nan=False`` so NaN/Infinity never reach a digest), in
   the SAD's own field order. The event SAD has a fixed top-level order:
   ``d``, ``i`` (the event name), then the envelope fields in
   ``events._ENVELOPE`` order. Nested objects (``body``, …) have no
   schema-fixed order, so their keys are sorted (code-point order, like
   ``sort_keys=True``) before serializing. keripy's ``Saider.verify`` accepts
   the resulting SAD unchanged.
+- numbers: only integers within ±(2**53 - 1); a non-integer quantity is
+  ``{"value": <int>, "scale": <int>}`` (numbers.py, C4). EventLog.append
+  refuses anything else before a SAID is computed.
 
 Including ``i`` binds the SAID to one name: the same content under another
 event id has another SAID. The log's seq/prev/digest are not hashed; the
@@ -65,8 +69,10 @@ def digest(ser: bytes) -> str:
 
 
 def dumps(sad: Mapping[str, Any]) -> bytes:
-    """keripy JSON serialization: compact, insertion order, UTF-8."""
-    return json.dumps(sad, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
+    """keripy JSON serialization: compact, insertion order, UTF-8. NaN and
+    ±Infinity raise ValueError (they are not JSON)."""
+    return json.dumps(sad, separators=(",", ":"), ensure_ascii=False,
+                      allow_nan=False).encode("utf-8")
 
 
 def saidify(sad: Mapping[str, Any], label: str = LABEL) -> tuple[str, dict[str, Any]]:

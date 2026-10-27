@@ -23,6 +23,7 @@ from agents_store.lineage import record_edge
 from agents_store.store import Store
 
 from .events import Event
+from .numbers import number_issues
 from .said import event_said
 
 
@@ -33,6 +34,20 @@ class StoreWriteRefused(RuntimeError):
     def __init__(self, refusals: tuple[Refusal, ...]):
         self.refusals = refusals
         super().__init__("; ".join(f"{r.a}: {r.reason}" for r in refusals))
+
+
+def assert_canonical_numbers(event: Event) -> None:
+    """Refuse an event that carries a non-canonical number (numbers.py, C4):
+    a binary float, NaN, ±Infinity, or an integer beyond ±(2**53 - 1).
+    Runs on the append path before anything is hashed or written. Each
+    refusal has a typed reason (numbers.REASONS), the envelope field in `a`
+    and the JSON path in `payload`."""
+    issues = number_issues(event.envelope())
+    if issues:
+        raise StoreWriteRefused(tuple(
+            Refusal(INTERNAL_WRAPPER, i.reason, a=i.path.split(".")[1].split("[")[0],
+                    payload=i.path)
+            for i in issues))
 
 
 def _store_backed(conn: sqlite3.Connection) -> bool:

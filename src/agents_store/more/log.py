@@ -24,7 +24,8 @@ from .checks import EVENT_MUTATED, Violation, check_event
 from .events import Event
 from .profile import Profile, load_profile
 from .said import event_said
-from .store_bridge import materialize_entity, materialize_lineage, store_backed
+from .store_bridge import (StoreWriteRefused, assert_canonical_numbers, materialize_entity,
+                           materialize_lineage, store_backed)
 
 SCHEMA = Path(__file__).resolve().parent / "schema.sql"
 
@@ -81,6 +82,15 @@ class EventLog:
         """Append or refuse. A refusal is recorded and raised, never silent."""
         if event.id is not None or event.seq is not None:
             raise ValueError("append takes a fresh event; ids are minted by the log")
+        try:
+            assert_canonical_numbers(event)
+        except StoreWriteRefused as refused:
+            payload = event.canonical(allow_nan=True).decode("utf-8")
+            for r in refused.refusals:
+                self.conn.execute(
+                    "INSERT INTO more_refusal (violation, detail, payload) VALUES (?, ?, ?)",
+                    (r.reason, r.payload or "", payload))
+            raise
         violations = check_event(event, self.profile)
         payload = event.canonical().decode("utf-8")
         if violations:
@@ -116,7 +126,13 @@ class EventLog:
     def _row(self, row) -> Event:
         seq, eid, envelope, prev, digest = row
         ev = Event.from_envelope(json.loads(envelope))
-        return ev.with_assigned(id=eid, seq=seq, prev=prev, digest=digest, said=event_said(ev, eid))
+        try:
+            said = event_said(ev, eid)
+        except ValueError:
+            # stored before the number guard with NaN/Infinity: no SAID can be
+            # computed (migrate.number_report lists such events)
+            said = None
+        return ev.with_assigned(id=eid, seq=seq, prev=prev, digest=digest, said=said)
 
     def events(self, subject: str | None = None) -> Iterator[Event]:
         if subject is None:
@@ -144,7 +160,9 @@ class EventLog:
         prev = ""
         for seq, eid, envelope, stored_prev, digest in self.conn.execute(
                 "SELECT seq, id, envelope, prev, digest FROM event ORDER BY seq"):
-            canon = Event.from_envelope(json.loads(envelope)).canonical()
+            # allow_nan: envelopes stored before the number guard may hold NaN;
+            # they are reported by migrate.number_report, not flagged as mutated
+            canon = Event.from_envelope(json.loads(envelope)).canonical(allow_nan=True)
             if canon != envelope.encode("utf-8"):
                 out.append(Violation(EVENT_MUTATED, f"seq {seq}: envelope is not canonical", eid))
             if stored_prev != prev:
