@@ -10,5 +10,5 @@
   python3 -m unittest discover -s tests/more -q
   ```
   → `Ran 114 tests in 0.304s` / `OK`
-- limits: No CLI/MCP surface (T18); subjects in MORe are still string ids, not necessarily store entities.
+- limits: CLI/MCP surface (T18) lives in agents-store as a domain-neutral provider surface (MORe is one domain); subjects in MORe were still string ids at T17 land, not necessarily store entities.
   (Later: schema v3 makes subjects and pins queryable: `more:subject` ref, `more:subject_ptr`, `more:pinned_against`; see `docs/more/README.md`.)

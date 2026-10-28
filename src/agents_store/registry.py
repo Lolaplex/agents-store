@@ -1,17 +1,19 @@
-"""Extension point: wrappers, capabilities and domain violation ids register here.
+"""Extension point: wrappers, capabilities, domains and violation ids register here.
 
 Entry-point groups (pyproject of an extension package):
     [project.entry-points."agents_store.wrappers"]       name = "pkg.module:factory"
     [project.entry-points."agents_store.capabilities"]   name = "pkg.module:factory"
     [project.entry-points."agents_store.violation_ids"]  name = "pkg.module:factory"
+    [project.entry-points."agents_store.domains"]        name = "pkg.module:factory"
 A factory takes no arguments and returns one Wrapper / Capability /
-DomainViolationId. Two registrants of the same id are a loud collision, never
-a silent overwrite.
+DomainViolationId / DomainProvider. Two registrants of the same id are a loud
+collision, never a silent overwrite.
 
 Domain violation ids that match a kernel id from the vendored
 kernel-proposal.json are refused. The owning domain registers its own ids;
-agents-store does not ship first-party domain ids in this group (same pattern
-as the empty wrappers / capabilities entry-point groups).
+agents-store does not ship first-party domain ids in that group (same pattern
+as the empty wrappers / capabilities entry-point groups). First-party domain
+providers (MORe) register via the domains entry-point group in this package.
 """
 from __future__ import annotations
 
@@ -20,11 +22,12 @@ from functools import lru_cache
 from importlib.metadata import entry_points
 from importlib.resources import files
 
-from .contracts import Capability, DomainViolationId, Wrapper
+from .contracts import Capability, DomainProvider, DomainViolationId, Wrapper
 
 WRAPPER_GROUP = "agents_store.wrappers"
 CAPABILITY_GROUP = "agents_store.capabilities"
 VIOLATION_ID_GROUP = "agents_store.violation_ids"
+DOMAIN_GROUP = "agents_store.domains"
 
 _KERNEL_ID_LIST_KEYS = (
     "violations",
@@ -77,6 +80,7 @@ class Registry:
         self.wrappers: dict[str, Wrapper] = {}
         self.capabilities: dict[str, Capability] = {}
         self.violation_ids: dict[str, DomainViolationId] = {}
+        self.domains: dict[str, DomainProvider] = {}
 
     def register_wrapper(self, w: Wrapper) -> Wrapper:
         if not isinstance(w, Wrapper):
@@ -125,6 +129,22 @@ class Registry:
         self.violation_ids[v.id] = v
         return v
 
+    def register_domain(self, d: DomainProvider) -> DomainProvider:
+        if not isinstance(d, DomainProvider):
+            raise RegistryError(f"{d!r} does not satisfy the DomainProvider protocol")
+        if not d.name or not isinstance(d.name, str):
+            raise RegistryError("domain name must be a non-empty string")
+        if d.name in self.domains:
+            raise RegistryError(f"domain name collision: {d.name!r} already registered")
+        self.domains[d.name] = d
+        return d
+
+    def domain(self, name: str) -> DomainProvider:
+        try:
+            return self.domains[name]
+        except KeyError:
+            raise RegistryError(f"no domain registered under {name!r}") from None
+
     def wrapper(self, wid: str) -> Wrapper:
         try:
             return self.wrappers[wid]
@@ -144,3 +164,5 @@ class Registry:
             self.register_capability(ep.load()())
         for ep in entry_points(group=VIOLATION_ID_GROUP):
             self.register_violation_id(ep.load()())
+        for ep in entry_points(group=DOMAIN_GROUP):
+            self.register_domain(ep.load()())

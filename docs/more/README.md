@@ -207,7 +207,24 @@ signed and establish no key state.
 ## Still owned by the board
 
 - Board UI projection of JWF / work-item state from store-backed logs
-- CLI/MCP surface for MORe append (T18)
+
+## CLI/MCP surface (T18)
+
+Lives in **agents-store**, not the board. agents-store is the semantic kernel
+(minted IDs, datoms, grants, mediators). Domains plug in as providers:
+
+- Entry-point group `agents_store.domains` (see `docs/ARCHITECTURE.md`).
+- First provider: **more** (`agents_store.domains.more`) — append goes through
+  `EventLog.append` / `store_bridge` → `Store.transact`.
+- Domain-neutral CLI: `agents-store append --domain more --actor <did> …`,
+  `agents-store domains`.
+- Domain-neutral MCP (stdio): tools `append` and `domains`. Actor comes from
+  server config, never from the tool caller. No HTTP; Lean MCP later.
+- The board keeps its PHP `submitKernel` path for now.
+
+CalDAV wrappers (`ical`, `jsoncal`) and mediators stay projections/adapters,
+not domain providers in this slice. A future calendar provider would expose
+`put`/`sync` write ops over wrapper.put → store.transact.
 
 ## Domain violation ids (open registrar)
 
