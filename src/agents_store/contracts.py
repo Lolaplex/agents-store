@@ -134,3 +134,39 @@ class DomainViolationId:
 @dataclass(frozen=True)
 class CapabilityPath:
     steps: tuple[str, ...] = field(default_factory=tuple)  # capability ids, in order
+
+
+@runtime_checkable
+class DomainProvider(Protocol):
+    """A domain plugs into the store's domain-neutral CLI/MCP surface.
+
+    agents-store is the semantic kernel (minted IDs, datoms, grants,
+    mediators). Domains (MORe, POSIX, calendar, …) register as providers.
+    """
+
+    name: str
+
+    def write_ops(self) -> Sequence[str]:
+        """Operation names this domain exposes for writes (e.g. 'append')."""
+        ...
+
+    def read_ops(self) -> Sequence[str]:
+        """Operation names this domain exposes for reads (empty in T18)."""
+        ...
+
+    def refusal_ids(self) -> Sequence[str]:
+        """Snake_case reason ids this domain may return on WriteRefusal."""
+        ...
+
+    def append(
+        self,
+        conn: Any,
+        payload: Mapping[str, Any],
+        actor: str,
+    ) -> str | WriteRefusal:
+        """Admit one write. Returns the minted id, or a WriteRefusal.
+
+        Implementations MUST route store writes through Store.transact
+        (never raw SQL). ``actor`` is supplied by the surface, not guessed.
+        """
+        ...

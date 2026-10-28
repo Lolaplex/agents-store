@@ -33,6 +33,12 @@ acceptance = [
 # Owning domains register their ids; this package leaves the group empty
 # (same pattern as wrappers / capabilities).
 
+[project.entry-points."agents_store.domains"]
+more = "agents_store.domains.more:factory"
+
+[project.scripts]
+agents-store = "agents_store.cli:main"
+
 [tool.setuptools.packages.find]
 where = ["src"]
 

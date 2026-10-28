@@ -9,6 +9,10 @@ is `docs/MEGAPLAN.md`; the work breakdown is `docs/tasks/`.
 adapters/   I/O shells: folders, servers, files. The only place open()/listen() happens.
 wrappers/   Pure lenses: EntityView <-> representation text. No I/O, no clock, no RNG.
 core        Store, datoms, lineage, kinds, grants, registry, mediator, pane.
+domains/    Domain providers (MORe first). Kernel-plus-providers: the store is the
+            semantic kernel; domains register write/read ops on the CLI/MCP surface.
+surface/cli/mcp_server
+            Domain-neutral append + domains listing (T18). Stdio MCP only.
 more/       MORe v4 companion (event log, checks, JWF); T17 bridges admitted events
             into the entity store (see docs/more/README.md). Tests in tests/more/.
 schema.sql  Contract DDL. Changes here are contract changes (docs/tasks/README.md).
@@ -83,10 +87,20 @@ History queries walk `datom` by entity/tx; `v_current` is always derivable.
    - `agents_store.wrappers` — Wrapper factories
    - `agents_store.capabilities` — Capability factories
    - `agents_store.violation_ids` — DomainViolationId factories
+   - `agents_store.domains` — DomainProvider factories (name + write/read ops
+     + refusal ids; first-party `more` registers here)
    Two registrants of the same id are a loud collision, never a silent
    overwrite. Kernel violation ids from the vendored
    `more/kernel-proposal.json` are reserved: a domain must not register one
    (see "Domain violation ids" below).
+
+   **Kernel + domain providers.** agents-store is the semantic kernel and
+   relational store (minted IDs, datoms, grants, mediators — Lotus Notes-like).
+   MORe is one domain provider; POSIX or calendar would be others. The CLI
+   (`agents-store`) and stdio MCP expose domain-neutral tools (`append`,
+   `domains`); a provider implements those ops over `Store.transact`. CalDAV
+   wrappers/mediators remain projections; a calendar domain would wrap them
+   later rather than renaming them into this group.
 2. New attrs: wrapper seeds its `ns:*` attrs in `attrs()`; core vocabulary in
    `seed.sql` only (contract change).
 3. New kind: `kind` row (JSON required/optional/derivations).
