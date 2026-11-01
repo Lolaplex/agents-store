@@ -37,6 +37,12 @@ class BoardKinds(unittest.TestCase):
     def test_jwf_node_levels_covered(self):
         self.assertTrue({"BP", "CM", "AC", "UI", "API"} <= set(KINDS.values()))
 
+    def test_regulation_requirement_kind_map(self):
+        self.assertEqual(
+            self.cfg["kind_map"]["regulation_requirement"],
+            "regulation_requirement",
+        )
+
     def test_relation_map_is_flat_and_typed(self):
         for board_rel, kernel in self.cfg["relation_map"].items():
             self.assertIsInstance(kernel, str)

@@ -17,6 +17,7 @@ providers (MORe) register via the domains entry-point group in this package.
 """
 from __future__ import annotations
 
+import hashlib
 import json
 from functools import lru_cache
 from importlib.metadata import entry_points
@@ -28,6 +29,12 @@ WRAPPER_GROUP = "agents_store.wrappers"
 CAPABILITY_GROUP = "agents_store.capabilities"
 VIOLATION_ID_GROUP = "agents_store.violation_ids"
 DOMAIN_GROUP = "agents_store.domains"
+
+# Pin: Cypoe/more-framework@bb37b5d lean-model/kernel-proposal.json (byte-identical vendored copy).
+MORE_FRAMEWORK_PIN = "bb37b5d8d859415202e0f07c67238696f2e86605"
+KERNEL_PROPOSAL_SHA256 = (
+    "85fe02422511058b341fe2c9303fdd377a6914afd6cbc9a9318f457c6ffb24cb"
+)
 
 _KERNEL_ID_LIST_KEYS = (
     "violations",
@@ -61,17 +68,54 @@ def _collect_kernel_ids(node: object, out: set[str]) -> None:
 
 
 @lru_cache(maxsize=1)
+def _kernel_spec() -> dict:
+    raw = files("agents_store.more").joinpath("kernel-proposal.json").read_text(
+        encoding="utf-8"
+    )
+    return json.loads(raw)
+
+
+@lru_cache(maxsize=1)
+def kernel_proposal_sha256() -> str:
+    """SHA-256 of the vendored kernel-proposal.json bytes."""
+    data = files("agents_store.more").joinpath("kernel-proposal.json").read_bytes()
+    return hashlib.sha256(data).hexdigest()
+
+
+@lru_cache(maxsize=1)
+def kernel_artifact_types() -> frozenset[str]:
+    """Artifact type ids from kernel-proposal.json layers.artifact_types."""
+    return frozenset(_kernel_spec()["layers"]["artifact_types"])
+
+
+@lru_cache(maxsize=1)
+def kernel_relation_types() -> frozenset[str]:
+    """Relation type keys from kernel-proposal.json layers.relations.types."""
+    return frozenset(_kernel_spec()["layers"]["relations"]["types"])
+
+
+@lru_cache(maxsize=1)
+def kernel_relation_reverse_names() -> frozenset[str]:
+    """Reverse relation names declared on kernel relation types (e.g. mapped_from)."""
+    types = _kernel_spec()["layers"]["relations"]["types"]
+    out: set[str] = set()
+    for spec in types.values():
+        if isinstance(spec, dict):
+            rev = spec.get("reverse")
+            if isinstance(rev, str):
+                out.add(rev)
+    return frozenset(out)
+
+
+@lru_cache(maxsize=1)
 def kernel_violation_ids() -> frozenset[str]:
     """Ids named by the vendored MORe kernel-proposal.json.
 
     Domains must not register these; they belong to the product-management
     domain (more-framework), not to a domain package.
     """
-    raw = files("agents_store.more").joinpath("kernel-proposal.json").read_text(
-        encoding="utf-8"
-    )
     found: set[str] = set()
-    _collect_kernel_ids(json.loads(raw), found)
+    _collect_kernel_ids(_kernel_spec(), found)
     return frozenset(found)
 
 

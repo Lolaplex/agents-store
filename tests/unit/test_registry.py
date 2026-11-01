@@ -152,9 +152,15 @@ class TestDomainViolationIds(unittest.TestCase):
         self.assertIn("generated_provenance_missing", ids)
         self.assertIn("board_evidence_source_invalid", ids)
         self.assertIn("envelope_invalid", ids)
-        # Domain example ids must not be in the kernel set.
         self.assertNotIn("prose_string_missing", ids)
         self.assertNotIn("prose_language_fallback", ids)
+
+    def test_kernel_compliance_violation_ids(self):
+        ids = kernel_violation_ids()
+        self.assertIn("maps_to_target_mismatch", ids)
+        self.assertIn("maps_to_compliance_purpose_invalid", ids)
+        self.assertIn("duty_unmapped", ids)
+        self.assertIn("matrix_hand_edited", ids)
 
 
 if __name__ == "__main__":

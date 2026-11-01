@@ -16,7 +16,7 @@ R2, XSD3, TC1 = "REQ-1@2", "XSD-1@3", "TC-1@1"
 CI = "did:example:ci"
 FIELD_RULES = tuple(("verification", q) for q in ("value_range", "optionality", "cardinality", "dependency"))
 
-REPR = Pointer("P-1", R2, XSD3, "represented_by", FIELD_RULES)
+REPR = Pointer("P-1", R2, XSD3, "derives_into", FIELD_RULES)
 VERIF = Pointer("P-2", R2, TC1, "verifies", (("verification", "value_range"),))
 FLOAT = Pointer("P-3", R2, "XSD-1", "references")
 

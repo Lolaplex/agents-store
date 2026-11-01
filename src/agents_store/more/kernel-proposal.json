@@ -606,6 +606,13 @@
           "de": "gehoert zu Baseline",
           "preserves": null,
           "src": "BEL §5.3"
+        },
+        "maps_to": {
+          "reverse": "mapped_from",
+          "preserves": "required; exactly one level and one event_type on preserves[] with purpose compliance (registered purpose); ambiguous, missing, or wrong-purpose entries yield no mapping (generated_projections.compliance_matrix.maps_to_preserves)",
+          "target": "pinned regulation corpus text: subject = regulation label, version = duty_version of the source regulation_requirement; mismatch or floating target is maps_to_target_mismatch",
+          "claim": "none",
+          "src": "LEI Compliance Intensiv; generated_projections.compliance_matrix (Fabian, 2026-11-01)"
         }
       },
       "evidence": {
@@ -645,7 +652,13 @@
       "baseline": "BL, a set of pinned pointers (artifacts AND relations), BEL §5.3",
       "production_evidence": "PROD, ELSTER §11.3",
       "implementation": "external artifact (code, story); held in its own home, pointed to, never copied; NOT a projection (ELSTER §6)",
-      "derivative": "artifact with a required mode: generated (validator, generated test, XSD/API schema, generated target code) or authored (written from pinned sources); manuals and handbooks may be either, with derives_from + preserves[]; NOT a projection (BEL §7.2, MP p.6, ELSTER Phase D; C21; manuals and mode: C21 Q6, Fabian 2026-10-27)"
+      "derivative": "artifact with a required mode: generated (validator, generated test, XSD/API schema, generated target code) or authored (written from pinned sources); manuals and handbooks may be either, with derives_from + preserves[]; NOT a projection (BEL §7.2, MP p.6, ELSTER Phase D; C21; manuals and mode: C21 Q6, Fabian 2026-10-27)",
+      "regulation_requirement": {
+        "regulation": "regulation corpustext label (DORA, NIS2, KRITIS-Dachgesetz, MaRisk, ISO 27001, ...)",
+        "duty_id": "stable duty id within that regulation",
+        "duty_version": "version of the duty text",
+        "src": "LEI Compliance Intensiv / generated_projections.compliance_matrix (Fabian, 2026-11-01)"
+      }
     },
     "projection_kinds": {
       "document": "IA §6 'Dokumente sind Sichten'",
@@ -986,7 +999,8 @@
           "conceptual_model": "hierarchy_node CM",
           "acceptance_criterion": "hierarchy_node AC",
           "ui_spec": "hierarchy_node UI",
-          "api_spec": "hierarchy_node API"
+          "api_spec": "hierarchy_node API",
+          "regulation_requirement": "regulation_requirement"
         },
         "kind_map_hierarchy": {
           "domain": {
@@ -1058,6 +1072,7 @@
           "references": "references",
           "evidences": "verifies",
           "implements": "implements",
+          "maps_to": "maps_to",
           "follow": "board-only"
         },
         "relation_map_sources": {
@@ -1151,7 +1166,8 @@
             "conceptual_model": "conceptual model (CM)",
             "acceptance_criterion": "acceptance criterion (AC)",
             "ui_spec": "user interface (UI)",
-            "api_spec": "interface (API)"
+            "api_spec": "interface (API)",
+            "regulation_requirement": "regulation requirement"
           },
           "kind_terms_note": "One shared vocabulary: the board kind strings stay (storage and API keys); the board shows the MORe term. Lean More/BoardProjection.lean boardKindTerm. Sources: US whitepaper §1 and §6 (a user story is an implementation element), kind_map, LEI hierarchy.",
           "evidence_source_kinds": [
@@ -1172,6 +1188,7 @@
             "challenge_open",
             "gap_signal_open"
           ],
+          "open_item_detail": "optional string on typed open items: ViolationId.name for dor_violation, pointer id for claim_unmet; omitted for other reasons (Lean TypedOpenItem.detail; companion/python more_kernel/world_model.py)",
           "challenge": "board projection (M34 file briefs; DISCIPLINE.md)",
           "compliance_gap": "compliance matrix projection: any row with gap at the subject's hierarchy level (More/Compliance.lean matrix, More/WorldModel.lean complianceOpenItems)",
           "compliance_gap_field": "compliance",
@@ -1361,6 +1378,20 @@
         "board_dependency_cycle",
         "author_node_invalid"
       ],
+      "violations": [
+        {
+          "id": "duty_unmapped",
+          "fires_when": "a regulation_requirement artifact has no maps_to pointer from its artifact@version with level and event_type on preserves[]",
+          "provenance_ref": "generated_projections.compliance_matrix",
+          "severity": "warning"
+        },
+        {
+          "id": "matrix_hand_edited",
+          "fires_when": "a stored compliance matrix differs from the projection matrix(complianceDuties, complianceMaps, subjects, log)",
+          "provenance_ref": "generated_projections.compliance_matrix",
+          "severity": "refusal"
+        }
+      ],
       "must_not_reuse_for_board_gates": [
         {
           "id": "dor_dependency_unresolved",
@@ -1381,9 +1412,15 @@
       "kind": "projection (never hand-kept)",
       "inputs": [
         "regulation_requirement artifacts (one per duty, ID + version of the regulation text)",
-        "maps_to pointers: requirement -> (hierarchy level, event type)",
+        "maps_to pointers: requirement artifact@version -> regulation corpus@duty_version (target), with compliance-purpose preserves for hierarchy level and event type",
         "event log"
       ],
+      "maps_to_preserves": {
+        "purpose": "compliance (purpose_register.profiles.compliance_matrix)",
+        "level": "exactly one preserves[] entry with purpose compliance whose property equals hierarchy Level.key",
+        "event_type": "exactly one preserves[] entry with purpose compliance whose property equals EventType.key",
+        "note": "Wrong purpose on a level or event_type property is maps_to_compliance_purpose_invalid and mappingOf returns none (even if compliance entries also exist). More than one level or event_type entry makes mappingOf return none; relation check reports preserves_missing when purpose is ok but entries are ambiguous"
+      },
       "function": "for each duty: level + event type that evidences it, plus the live events satisfying it per subject@version; gaps = duties with no satisfying event",
       "row": [
         "regulation",
@@ -1395,7 +1432,10 @@
       ],
       "violations": [
         "matrix_hand_edited",
-        "duty_unmapped"
+        "duty_unmapped",
+        "maps_to_target_mismatch",
+        "maps_to_compliance_purpose_invalid",
+        "preserves_missing"
       ],
       "regulations": [
         "DORA",
@@ -1590,6 +1630,26 @@
       "approval": "{status: pending, what} until Fabian approves the names; then {status: approved, by, date}"
     },
     "profiles": {
+      "compliance_matrix": {
+        "entries": [
+          {
+            "key": "compliance",
+            "meaning": "Which hierarchy level and event type evidence a regulatory duty on a maps_to pointer",
+            "invariants": ["level", "event_type"],
+            "provenance": {
+              "kind": "profile_addition",
+              "profile": "compliance-matrix",
+              "src": "generated_projections.compliance_matrix.maps_to_preserves (Fabian, 2026-11-01)",
+              "ruling": "PR #18 open question 3 (Fabian, 2026-11-01)"
+            },
+            "approval": {
+              "status": "approved",
+              "by": "Fabian Schindler",
+              "date": "2026-11-01"
+            }
+          }
+        ]
+      },
       "agents_design": {
         "note": "The entries are render, interaction, accessibility, theming and manual. All five are profile additions, approved by Fabian on 2026-10-27 (approval.status). agents-design's acceptance, operations and (per ruling C21) verification are the sourced purposes, not entries. Ruling C21 Q6 dropped agents-design's docs purpose: prose specs are sources and generated documentation is a projection (core_primitives.derivative.documentation_split). Manuals are derivatives, and their purpose is the entry manual (more-lean-model.md §12d).",
         "entries": [
