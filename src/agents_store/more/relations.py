@@ -14,26 +14,53 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Iterable
 
+from .compliance import (
+    COMPLIANCE_PURPOSE,
+    MAPS_TO_COMPLIANCE_PURPOSE_INVALID,
+    MAPS_TO_TARGET_MISMATCH,
+    PRESERVES_MISSING,
+    RegulationRequirement,
+    maps_to_compliance_purpose_invalid,
+    maps_to_regulation_target,
+)
 from .events import Event, is_pinned, parse_ref
-from .profile import Profile
+from .profile import Profile, load_profile
 from .status import _events, _gate_accepted, _inactive
+
+
+# RelType.reverse (kernel-proposal.json layers.relations.types)
+REL_TYPE_REVERSE: dict[str, str] = {
+    "refines": "is_refined_by",
+    "references": "is_referenced_by",
+    "derives_from": "derives_into",
+    "derives_into": "derives_from",
+    "implements": "implemented_by",
+    "verifies": "verified_by",
+    "decided_in": "affects",
+    "causes_risk": "results_from",
+    "depends_on": "is_prerequisite_of",
+    "member_of": "contains",
+    "maps_to": "mapped_from",
+    "validated_by": "validates",
+    "accepted_by": "accepts",
+    "nav": "nav",
+}
 
 POINTER_UNPINNED = "pointer_unpinned"
 POINTER_SUSPECT = "pointer_suspect"
-PRESERVES_MISSING = "preserves_missing"
 CLAIM_UNMET = "claim_unmet"
 
 # RelType.claim. Types not listed claim nothing.
 CLAIM = {
     "derives_from": "derivation",
-    "represented_by": "derivation",
+    "derives_into": "derivation",
     "implements": "test",
     "verifies": "test",
     "validated_by": "validation",
     "accepted_by": "acceptance",
 }
 # RelType.needsPreserves
-NEEDS_PRESERVES = {"derives_from", "represented_by", "implements", "verifies"}
+NEEDS_PRESERVES = {"derives_from", "derives_into", "implements", "verifies", "maps_to"}
 
 
 @dataclass(frozen=True)
@@ -97,31 +124,89 @@ def suspect(source, ptr: Pointer) -> bool:
                and ptr.target in e.pinned_against for e in events)
 
 
-def relation_violations(source, ptr: Pointer, profile: Profile) -> list[str]:
+def _is_level_property(prop: str) -> bool:
+    return prop in load_profile().levels
+
+
+def _is_event_type_property(prop: str) -> bool:
+    return prop in {"decision", "verification", "inclusion", "supersession", "overrule", "move"}
+
+
+def _maps_to_preserved(ptr: Pointer) -> bool:
+    if ptr.type != "maps_to":
+        return False
+    lvls = [prop for purp, prop in ptr.preserves if purp == COMPLIANCE_PURPOSE and _is_level_property(prop)]
+    ets = [prop for purp, prop in ptr.preserves if purp == COMPLIANCE_PURPOSE and _is_event_type_property(prop)]
+    return len(lvls) == 1 and len(ets) == 1
+
+
+def _maps_to_target_mismatch(reqs: list[RegulationRequirement], ptr: Pointer) -> bool:
+    if ptr.type != "maps_to":
+        return False
+    req = next((r for r in reqs if r.ref == ptr.source), None)
+    if req is None:
+        return True
+    return ptr.floating or ptr.target != maps_to_regulation_target(req)
+
+
+def relation_violations(
+    source,
+    ptr: Pointer,
+    profile: Profile,
+    *,
+    regulation_requirements: list[RegulationRequirement] | None = None,
+) -> list[str]:
+    reqs = regulation_requirements or []
     out = []
     if ptr.floating and ptr.type != "nav":
         out.append(POINTER_UNPINNED)
     if suspect(source, ptr):
         out.append(POINTER_SUSPECT)
-    if ptr.type in NEEDS_PRESERVES and not ptr.preserves:
+    if ptr.type == "maps_to":
+        if _maps_to_target_mismatch(reqs, ptr):
+            out.append(MAPS_TO_TARGET_MISMATCH)
+        if maps_to_compliance_purpose_invalid(ptr):
+            out.append(MAPS_TO_COMPLIANCE_PURPOSE_INVALID)
+        if not maps_to_compliance_purpose_invalid(ptr) and not _maps_to_preserved(ptr):
+            out.append(PRESERVES_MISSING)
+    elif ptr.type in NEEDS_PRESERVES and not ptr.preserves:
         out.append(PRESERVES_MISSING)
     if not claim_met(source, ptr, profile):
         out.append(CLAIM_UNMET)
     return out
 
 
-def relation_check(source, pointers: Iterable[Pointer], profile: Profile) -> list[tuple[str, str]]:
-    return [(p.id, v) for p in pointers for v in relation_violations(source, p, profile)]
+def relation_check(
+    source,
+    pointers: Iterable[Pointer],
+    profile: Profile,
+    *,
+    regulation_requirements: list[RegulationRequirement] | None = None,
+) -> list[tuple[str, str]]:
+    return [
+        (p.id, v)
+        for p in pointers
+        for v in relation_violations(
+            source, p, profile, regulation_requirements=regulation_requirements
+        )
+    ]
 
 
 # RelType.isRepresentation: the only edges that can make two refs equivalent.
-REPRESENTATION = {"derives_from", "represented_by"}
+REPRESENTATION = {"derives_from", "derives_into"}
 PURPOSES = ("verification", "acceptance", "operations")
 
 
+def known_purpose(profile: Profile, purpose: str) -> bool:
+    """Sourced, or registered in the profile (Lean Purpose.knownIn, §12d)."""
+    return purpose in PURPOSES or purpose in profile.settings.get("purposes", ())
+
+
 def valid_for(profile: Profile, purpose: str, ptr: Pointer) -> bool:
-    """A pinned representation edge that preserves every invariant relevant
-    to `purpose` (Lean validFor)."""
+    """A known purpose and a pinned representation edge that preserves every
+    invariant relevant to `purpose` (Lean validFor)."""
+    if not known_purpose(profile, purpose):
+        return False
     relevant = profile.setting("relevant")[purpose]
     return (ptr.type in REPRESENTATION and not ptr.floating
             and all((purpose, q) in ptr.preserves for q in relevant))

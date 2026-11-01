@@ -2,11 +2,9 @@
 More/Compliance.lean; kernel-proposal.json
 generated_projections.compliance_matrix).
 
-Inputs: one duty per regulation text (id and version), maps_to mappings
-duty -> (hierarchy level, event type), the subjects with their level, and
-the event log. The matrix is a pure function of these. A stored matrix
-that differs from it is matrix_hand_edited; a duty with no mapping is
-duty_unmapped. Mappings are per organisation, not part of the kernel.
+Inputs: `regulation_requirement` artifacts and `maps_to` pointers (level and event
+type on `preserves[]` with purpose compliance), subjects with hierarchy level, and
+the event log. Duties and mappings are derived, never parallel side lists.
 """
 from __future__ import annotations
 
@@ -14,10 +12,16 @@ from dataclasses import dataclass
 from typing import Iterable
 
 from .checks import Violation
+from .profile import load_profile
 from .status import _events, _gate_accepted, _inactive
 
 DUTY_UNMAPPED = "duty_unmapped"
 MATRIX_HAND_EDITED = "matrix_hand_edited"
+PRESERVES_MISSING = "preserves_missing"
+MAPS_TO_TARGET_MISMATCH = "maps_to_target_mismatch"
+MAPS_TO_COMPLIANCE_PURPOSE_INVALID = "maps_to_compliance_purpose_invalid"
+MAPS_TO_REL_REVERSE = "mapped_from"
+COMPLIANCE_PURPOSE = "compliance"
 ROW = ("regulation", "duty_id@version", "level", "event_type", "satisfying_events", "gap")
 
 
@@ -43,6 +47,77 @@ class Mapping:
 class Subject:
     ref: str      # "SUBJECT@VERSION"
     level: str
+
+
+@dataclass(frozen=True)
+class RegulationRequirement:
+    ref: str
+    regulation: str
+    duty_id: str
+    duty_version: str
+
+
+EVENT_TYPE_KEYS = ("decision", "verification", "inclusion", "supersession", "overrule", "move")
+
+
+def duty_of(req: RegulationRequirement) -> Duty:
+    return Duty(req.regulation, req.duty_id, req.duty_version)
+
+
+def compliance_duties(reqs: Iterable[RegulationRequirement]) -> list[Duty]:
+    return [duty_of(r) for r in reqs]
+
+
+def _levels_from_preserves(preserves: Iterable[tuple[str, str]], levels: Iterable[str]) -> list[str]:
+    level_set = set(levels)
+    return [prop for purp, prop in preserves if purp == COMPLIANCE_PURPOSE and prop in level_set]
+
+
+def _event_types_from_preserves(preserves: Iterable[tuple[str, str]]) -> list[str]:
+    et_set = set(EVENT_TYPE_KEYS)
+    return [prop for purp, prop in preserves if purp == COMPLIANCE_PURPOSE and prop in et_set]
+
+
+def maps_to_regulation_target(req: RegulationRequirement) -> str:
+    return f"{req.regulation}@{req.duty_version}"
+
+
+def maps_to_compliance_purpose_invalid(ptr) -> bool:
+    if getattr(ptr, "type", None) != "maps_to":
+        return False
+    for purp, prop in ptr.preserves:
+        if purp != COMPLIANCE_PURPOSE and (
+            prop in load_profile().levels
+            or prop in {"decision", "verification", "inclusion", "supersession", "overrule", "move"}
+        ):
+            return True
+    return False
+
+
+def mapping_of(reqs: Iterable[RegulationRequirement], ptr, levels: Iterable[str]) -> Mapping | None:
+    if ptr.type != "maps_to":
+        return None
+    if maps_to_compliance_purpose_invalid(ptr):
+        return None
+    req = next((r for r in reqs if r.ref == ptr.source), None)
+    if req is None:
+        return None
+    if ptr.floating or ptr.target != maps_to_regulation_target(req):
+        return None
+    lvls = _levels_from_preserves(ptr.preserves, levels)
+    ets = _event_types_from_preserves(ptr.preserves)
+    if len(lvls) != 1 or len(ets) != 1:
+        return None
+    return Mapping(req.duty_id, req.duty_version, lvls[0], ets[0])
+
+
+def compliance_maps(reqs: Iterable[RegulationRequirement], ptrs, levels: Iterable[str]) -> list[Mapping]:
+    out: list[Mapping] = []
+    for ptr in ptrs:
+        m = mapping_of(reqs, ptr, levels)
+        if m is not None:
+            out.append(m)
+    return out
 
 
 @dataclass(frozen=True)
@@ -97,10 +172,50 @@ def unmapped(duties, maps) -> list[Duty]:
     return [d for d in duties if not any(m.covers(d) for m in maps)]
 
 
+def duty_unmapped_detail(d: Duty) -> str:
+    return f"{d.regulation} {d.id}@{d.version}"
+
+
 def compliance_violations(duties, maps, subjects, source, stored) -> list[Violation]:
     duties, maps = list(duties), list(maps)
-    out = [Violation(DUTY_UNMAPPED, f"{d.regulation} {d.id}@{d.version}")
-           for d in unmapped(duties, maps)]
-    if list(stored) != matrix(duties, maps, subjects, source):
+    projected = matrix(duties, maps, subjects, source)
+    out = [Violation(DUTY_UNMAPPED, duty_unmapped_detail(d)) for d in unmapped(duties, maps)]
+    if list(stored) != projected:
         out.append(Violation(MATRIX_HAND_EDITED, "stored matrix differs from the projection"))
     return out
+
+
+def compliance_matrix_from_inputs(
+    regulation_requirements: Iterable[RegulationRequirement],
+    pointers: Iterable,
+    matrix_subjects: Iterable[Subject],
+    source,
+    *,
+    levels: Iterable[str] | None = None,
+) -> list[Row]:
+    """Lean `complianceMatrix` / `matrix (complianceDutiesOf w) (complianceMapsOf w) …`."""
+    lvls = load_profile().levels if levels is None else levels
+    reqs = list(regulation_requirements)
+    return matrix(
+        compliance_duties(reqs),
+        compliance_maps(reqs, pointers, lvls),
+        matrix_subjects,
+        source,
+    )
+
+
+def compliance_violations_from_inputs(
+    regulation_requirements: Iterable[RegulationRequirement],
+    pointers: Iterable,
+    matrix_subjects: Iterable[Subject],
+    source,
+    stored: list[Row],
+    *,
+    levels: Iterable[str] | None = None,
+) -> list[Violation]:
+    """Lean `complianceViolationsFromInputs` (author-view duty_unmapped, matrix_hand_edited)."""
+    lvls = load_profile().levels if levels is None else levels
+    reqs = list(regulation_requirements)
+    duties = compliance_duties(reqs)
+    maps = compliance_maps(reqs, pointers, lvls)
+    return compliance_violations(duties, maps, matrix_subjects, source, stored)

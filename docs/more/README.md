@@ -4,18 +4,20 @@ The Python MORe v4 companion from [Cypoe/more-framework](https://github.com/Cypo
 
 ## Vendoring pin
 
-Companion modules match
-[Cypoe/more-framework](https://github.com/Cypoe/more-framework) at merge
-**`3681d271`** on `master` (PR #5 *kernel-impl*; branch tip **`e32e5c3`**).
-`kernel-proposal.json` is a **byte-identical** copy of
-`lean-model/kernel-proposal.json` at **`d60e40a`** on `master` (sha256
-`52ea67191c6c6d1c95025a28605bf2bf5f8ad323fbd604b59cc7f363d8b214fb`).
-Upstream layout at those revisions:
+Companion modules and `kernel-proposal.json` match
+[Cypoe/more-framework](https://github.com/Cypoe/more-framework) **`master`**
+at **`bb37b5d8d859415202e0f07c67238696f2e86605`** (merge of PR #18 regulation
+`maps_to` / `regulation_requirement` and PR #20 compliance derivation from
+inputs). `kernel-proposal.json` is a **byte-identical** copy of
+`lean-model/kernel-proposal.json` at that commit (sha256
+`85fe02422511058b341fe2c9303fdd377a6914afd6cbc9a9318f457c6ffb24cb`). Recorded
+in code as `MORE_FRAMEWORK_PIN` and `KERNEL_PROPOSAL_SHA256` in
+`registry.py`.
 
-| agents-store | more-framework |
+| agents-store | more-framework @ `bb37b5d` |
 |---|---|
-| `src/agents_store/more/*.py` | `companion/python/more_kernel/*.py` @ `e32e5c3` |
-| `src/agents_store/more/kernel-proposal.json` | `lean-model/kernel-proposal.json` @ `d60e40a` |
+| `src/agents_store/more/*.py` | `companion/python/more_kernel/*.py` |
+| `src/agents_store/more/kernel-proposal.json` | `lean-model/kernel-proposal.json` |
 | `tests/more/` | `companion/python/tests/` (+ store integration tests) |
 
 **Board kinds (partial re-vendor).** `projections.lolaplex-board.board_only_config`
@@ -39,7 +41,7 @@ labels from the neutralised workflow deck (e.g. `In Abnahme`, `Abgenommen`,
 ## Loaded here
 
 - Event log, checks, derived status, gates, JWF board state, relations, readiness, hierarchy lint, compliance projection, cut-over profile
-- Companion unit tests in `tests/more/` (**114** at `e9f470868be05a5031217382bd0aa48583d09737`)
+- Companion unit tests in `tests/more/` (**180** MORe companion tests at this pin)
 
 ## Store integration (T17)
 
