@@ -1168,10 +1168,19 @@
             "decision_open",
             "dor_violation",
             "claim_unmet",
+            "compliance_gap",
             "challenge_open",
             "gap_signal_open"
           ],
           "challenge": "board projection (M34 file briefs; DISCIPLINE.md)",
+          "compliance_gap": "compliance matrix projection: any row with gap at the subject's hierarchy level (More/Compliance.lean matrix, More/WorldModel.lean complianceOpenItems)",
+          "compliance_gap_field": "compliance",
+          "compliance_gap_ref": {
+            "regulation": "string",
+            "duty": "string",
+            "duty_version": "string",
+            "event_type": "event type id from core_primitives.event.types"
+          },
           "gap": "signal-derived (gap-open/gap-closed); not MORe artifact kind",
           "jwf_index": "per board issue: jwfLevel over the author context's nodes and pointers (More/BoardProjection.lean worldInputsOfCtx, worldModel_jwfIndex_issue)",
           "board_column": {
