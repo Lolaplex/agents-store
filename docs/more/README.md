@@ -4,15 +4,18 @@ The Python MORe v4 companion from [Cypoe/more-framework](https://github.com/Cypo
 
 ## Vendoring pin
 
-Companion modules and `kernel-proposal.json` match
+Companion modules match
 [Cypoe/more-framework](https://github.com/Cypoe/more-framework) at merge
 **`3681d271`** on `master` (PR #5 *kernel-impl*; branch tip **`e32e5c3`**).
-Upstream layout at that revision:
+`kernel-proposal.json` is a **byte-identical** copy of
+`lean-model/kernel-proposal.json` at **`d60e40a`** on `master` (sha256
+`52ea67191c6c6d1c95025a28605bf2bf5f8ad323fbd604b59cc7f363d8b214fb`).
+Upstream layout at those revisions:
 
-| agents-store | more-framework @ `e32e5c3` |
+| agents-store | more-framework |
 |---|---|
-| `src/agents_store/more/*.py` | `companion/python/more_kernel/*.py` |
-| `src/agents_store/more/kernel-proposal.json` | `lean-model/kernel-proposal.json` |
+| `src/agents_store/more/*.py` | `companion/python/more_kernel/*.py` @ `e32e5c3` |
+| `src/agents_store/more/kernel-proposal.json` | `lean-model/kernel-proposal.json` @ `d60e40a` |
 | `tests/more/` | `companion/python/tests/` (+ store integration tests) |
 
 **Board kinds (partial re-vendor).** `projections.lolaplex-board.board_only_config`
