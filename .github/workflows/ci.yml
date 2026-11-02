@@ -46,4 +46,4 @@ jobs:
         run: python3 -m unittest discover -s tests/plugin -v
 
       - name: Run acceptance tests
-        run: python3 -m unittest discover -s tests/acceptance -v
+        run: python3 scripts/run_acceptance_ci.py
