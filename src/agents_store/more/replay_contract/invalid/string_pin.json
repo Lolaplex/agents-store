@@ -1,0 +1,35 @@
+{
+  "name": "string_pin",
+  "events": [
+    {
+      "id": 1,
+      "type": "decision",
+      "actor": "did:example:fabian",
+      "at_ms": 1000,
+      "subjects": [
+        "UC-1"
+      ],
+      "pinned_against": [
+        "UC-1@1"
+      ],
+      "body": {
+        "status": "open"
+      }
+    }
+  ],
+  "world_inputs": {
+    "pointers": [],
+    "nodes": [],
+    "subjects": [
+      {
+        "ref": "UC-1@1",
+        "board_kind": "use_case"
+      }
+    ],
+    "signals": [],
+    "open_challenges": [],
+    "matrix_subjects": [],
+    "regulation_requirements": []
+  },
+  "expected_open_items": []
+}

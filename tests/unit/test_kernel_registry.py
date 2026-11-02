@@ -9,6 +9,7 @@ from agents_store.registry import (
     kernel_relation_reverse_names,
     kernel_relation_types,
     kernel_violation_ids,
+    verify_replay_contract_manifest,
 )
 
 
@@ -37,6 +38,8 @@ class KernelRegistry(unittest.TestCase):
         ):
             self.assertIn(vid, ids)
 
+    def test_replay_contract_manifest(self):
+        self.assertEqual(verify_replay_contract_manifest(), [])
 
 if __name__ == "__main__":
     unittest.main()

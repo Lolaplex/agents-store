@@ -1,0 +1,49 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Test (Ubuntu - Python 3.12)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[acceptance]" -e plugins/radicale_agents_store
+
+      - name: Verify MORe replay contract manifest
+        run: python3 scripts/sync_more_replay.py --verify-only
+
+      - name: Run unit tests
+        run: python3 -m unittest discover -s tests/unit -v
+
+      - name: Run MORe companion tests
+        run: python3 -m unittest discover -s tests/more -v
+
+      - name: Run MORe replay contract tests
+        run: python3 -m unittest discover -s tests/replay -v
+
+      - name: Run plugin tests
+        run: python3 -m unittest discover -s tests/plugin -v
+
+      - name: Run acceptance tests
+        run: python3 -m unittest discover -s tests/acceptance -v

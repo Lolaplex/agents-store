@@ -1,0 +1,63 @@
+{
+  "name": "compliance_gap__duty_mapped__no_row",
+  "events": [],
+  "world_inputs": {
+    "subjects": [
+      {
+        "ref": "AC-1@1",
+        "board_kind": "acceptance_criterion"
+      }
+    ],
+    "pointers": [
+      {
+        "id": "P-S",
+        "source": "AC-1@1",
+        "target": "SPEC-1@1",
+        "type": "refines"
+      }
+    ],
+    "nodes": [
+      {
+        "id": "AC-1",
+        "level": "AC",
+        "parent": "UC-1",
+        "sections": {
+          "AC": "Criterion text."
+        }
+      },
+      {
+        "id": "SUB-AC",
+        "level": "AC",
+        "parent": "AC-1",
+        "sections": {
+          "AC": "Office confirms receipt."
+        }
+      },
+      {
+        "id": "UC-1",
+        "level": "Anwendungsfall",
+        "parent": "FG-1",
+        "sections": {
+          "Anwendungsfall": "File online."
+        }
+      }
+    ],
+    "matrix_subjects": [
+      {
+        "ref": "AC-1@1",
+        "level": "AC"
+      }
+    ],
+    "signals": [],
+    "open_challenges": [],
+    "regulation_requirements": [
+      {
+        "ref": "T-1@1",
+        "regulation": "TEST",
+        "duty_id": "T-1",
+        "duty_version": "1"
+      }
+    ]
+  },
+  "expected_open_items": []
+}

@@ -1,0 +1,68 @@
+{
+  "name": "dor_violation__dor_linked_decision_open__absent",
+  "events": [
+    {
+      "id": 1,
+      "type": "decision",
+      "actor": "did:example:fabian",
+      "at_ms": 1000,
+      "subjects": [
+        "DEC-1"
+      ],
+      "pinned_against": [
+        {
+          "ref": "DEC-1@1"
+        }
+      ],
+      "body": {
+        "status": "decided",
+        "decided_by": "did:example:fabian"
+      }
+    }
+  ],
+  "world_inputs": {
+    "subjects": [
+      {
+        "ref": "UC-1@1",
+        "board_kind": "use_case"
+      }
+    ],
+    "pointers": [
+      {
+        "id": "P-S",
+        "source": "UC-1@1",
+        "target": "SPEC-1@1",
+        "type": "refines"
+      },
+      {
+        "id": "P-D",
+        "source": "UC-1@1",
+        "target": "DEC-1@1",
+        "type": "decided_in"
+      }
+    ],
+    "nodes": [
+      {
+        "id": "AC-1",
+        "level": "AC",
+        "parent": "UC-1",
+        "sections": {
+          "AC": "Office confirms receipt."
+        }
+      },
+      {
+        "id": "UC-1",
+        "level": "Anwendungsfall",
+        "parent": "FG-1",
+        "sections": {
+          "Anwendungsfall": "File online."
+        }
+      }
+    ],
+    "signals": [],
+    "open_challenges": [],
+    "matrix_subjects": [],
+    "regulation_requirements": []
+  },
+  "expected_open_items": []
+}

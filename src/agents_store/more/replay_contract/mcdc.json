@@ -1,0 +1,128 @@
+{
+  "version": 2,
+  "reasons": {
+    "decision_open": {
+      "conditions": {
+        "open_decision_on_subject": {
+          "when_true": "decision_open__open_decision_on_subject__present",
+          "when_false": "decision_open__open_decision_on_subject__absent",
+          "differs_in": ["events"]
+        }
+      }
+    },
+    "dor_violation": {
+      "conditions": {
+        "dor_decision_open": {
+          "when_true": "dor_violation__dor_decision_open__present",
+          "when_false": "dor_violation__dor_decision_open__absent",
+          "differs_in": ["events"]
+        },
+        "dor_linked_decision_open": {
+          "when_true": "dor_violation__dor_linked_decision_open__present",
+          "when_false": "dor_violation__dor_linked_decision_open__absent",
+          "differs_in": ["events"]
+        },
+        "dor_ac_unclear": {
+          "when_true": "dor_violation__dor_ac_unclear__present",
+          "when_false": "dor_violation__dor_ac_unclear__absent",
+          "differs_in": ["world_inputs.nodes"]
+        },
+        "dor_dependency_unresolved": {
+          "when_true": "dor_violation__dor_dependency_unresolved__present",
+          "when_false": "dor_violation__dor_dependency_unresolved__absent",
+          "differs_in": ["events"]
+        },
+        "dor_spec_not_pointed": {
+          "when_true": "dor_violation__dor_spec_not_pointed__present",
+          "when_false": "dor_violation__dor_spec_not_pointed__absent",
+          "differs_in": ["world_inputs.pointers"]
+        },
+        "dor_spec_restated": {
+          "when_true": "dor_violation__dor_spec_restated__present",
+          "when_false": "dor_violation__dor_spec_restated__absent",
+          "differs_in": ["world_inputs.nodes"]
+        }
+      }
+    },
+    "claim_unmet": {
+      "conditions": {
+        "claim_met": {
+          "when_true": "claim_unmet__claim_met__absent",
+          "when_false": "claim_unmet__claim_met__present",
+          "differs_in": ["events"]
+        }
+      }
+    },
+    "compliance_gap": {
+      "conditions": {
+        "duty_mapped": {
+          "when_true": "compliance_gap__duty_mapped__gap",
+          "when_false": "compliance_gap__duty_mapped__no_row",
+          "differs_in": ["world_inputs.pointers"]
+        },
+        "level_matches": {
+          "when_true": "compliance_gap__level_matches__gap",
+          "when_false": "compliance_gap__level_matches__no_match",
+          "differs_in": ["world_inputs.pointers"]
+        },
+        "event_type_matches": {
+          "when_true": "compliance_gap__event_type_matches__gap",
+          "when_false": "compliance_gap__event_type_matches__satisfied",
+          "differs_in": ["events"]
+        },
+        "event_completes": {
+          "when_true": "compliance_gap__event_completes__gap",
+          "when_false": "compliance_gap__event_completes__satisfied",
+          "differs_in": ["events"]
+        },
+        "event_active": {
+          "when_true": "compliance_gap__event_active__gap",
+          "when_false": "compliance_gap__event_active__satisfied",
+          "differs_in": ["events"]
+        },
+        "subject_pinned_in_event": {
+          "when_true": "compliance_gap__subject_pinned_in_event__gap",
+          "when_false": "compliance_gap__subject_pinned_in_event__satisfied",
+          "differs_in": ["events"]
+        }
+      }
+    },
+    "challenge_open": {
+      "conditions": {
+        "subject_in_open_challenges": {
+          "when_true": "challenge_open__subject_in_open_challenges__present",
+          "when_false": "challenge_open__subject_in_open_challenges__absent",
+          "differs_in": ["world_inputs.open_challenges"]
+        }
+      }
+    },
+    "gap_signal_open": {
+      "conditions": {
+        "gap_open_without_close": {
+          "when_true": "gap_signal_open__gap_open_without_close__present",
+          "when_false": "gap_signal_open__gap_open_without_close__absent",
+          "differs_in": ["world_inputs.signals"]
+        }
+      }
+    },
+    "maps_to_violation": {
+      "conditions": {
+        "target_mismatch": {
+          "when_true": "maps_to_violation__target_mismatch__present",
+          "when_false": "maps_to_violation__target_mismatch__absent",
+          "differs_in": ["world_inputs.pointers"]
+        },
+        "compliance_purpose_wrong": {
+          "when_true": "maps_to_violation__compliance_purpose_wrong__present",
+          "when_false": "maps_to_violation__compliance_purpose_wrong__absent",
+          "differs_in": ["world_inputs.pointers"]
+        },
+        "compliance_purpose_mixed": {
+          "when_true": "maps_to_violation__compliance_purpose_mixed__present",
+          "when_false": "maps_to_violation__compliance_purpose_mixed__absent",
+          "differs_in": ["world_inputs.pointers"]
+        }
+      }
+    }
+  }
+}

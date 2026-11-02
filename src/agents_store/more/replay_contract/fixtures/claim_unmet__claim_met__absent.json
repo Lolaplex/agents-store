@@ -1,0 +1,80 @@
+{
+  "name": "claim_unmet__claim_met__absent",
+  "events": [
+    {
+      "id": 1,
+      "type": "verification",
+      "actor": "did:example:ci",
+      "at_ms": 1000,
+      "subjects": [
+        "REQ-1"
+      ],
+      "pinned_against": [
+        {
+          "ref": "REQ-1@2"
+        },
+        {
+          "ref": "TC-1@1"
+        }
+      ],
+      "body": {
+        "stage": "test",
+        "method": "unit",
+        "result": "pass",
+        "gate": "ci",
+        "witness": "run-1"
+      }
+    }
+  ],
+  "world_inputs": {
+    "subjects": [
+      {
+        "ref": "REQ-1@2",
+        "board_kind": "requirement"
+      }
+    ],
+    "pointers": [
+      {
+        "id": "P-S",
+        "source": "REQ-1@2",
+        "target": "SPEC-1@1",
+        "type": "refines"
+      },
+      {
+        "id": "P-2",
+        "source": "REQ-1@2",
+        "target": "TC-1@1",
+        "type": "verifies",
+        "preserves": [
+          [
+            "verification",
+            "value_range"
+          ]
+        ]
+      }
+    ],
+    "nodes": [
+      {
+        "id": "AC-R",
+        "level": "AC",
+        "parent": "REQ-1",
+        "sections": {
+          "AC": "Met when verified."
+        }
+      },
+      {
+        "id": "REQ-1",
+        "level": "Anwendungsfall",
+        "parent": "FG-1",
+        "sections": {
+          "Anwendungsfall": "Requirement text."
+        }
+      }
+    ],
+    "signals": [],
+    "open_challenges": [],
+    "matrix_subjects": [],
+    "regulation_requirements": []
+  },
+  "expected_open_items": []
+}
