@@ -1,0 +1,51 @@
+{
+  "name": "challenge_open__subject_in_open_challenges__present",
+  "events": [],
+  "world_inputs": {
+    "subjects": [
+      {
+        "ref": "UC-2@1",
+        "board_kind": "task"
+      }
+    ],
+    "pointers": [
+      {
+        "id": "P-S",
+        "source": "UC-2@1",
+        "target": "SPEC-1@1",
+        "type": "refines"
+      }
+    ],
+    "nodes": [
+      {
+        "id": "AC-2",
+        "level": "AC",
+        "parent": "UC-2",
+        "sections": {
+          "AC": "Office confirms receipt."
+        }
+      },
+      {
+        "id": "UC-2",
+        "level": "Anwendungsfall",
+        "parent": "FG-1",
+        "sections": {
+          "Anwendungsfall": "Task work."
+        }
+      }
+    ],
+    "open_challenges": [
+      "UC-2"
+    ],
+    "signals": [],
+    "matrix_subjects": [],
+    "regulation_requirements": []
+  },
+  "expected_open_items": [
+    {
+      "board_kind": "task",
+      "subject": "UC-2",
+      "reason": "challenge_open"
+    }
+  ]
+}

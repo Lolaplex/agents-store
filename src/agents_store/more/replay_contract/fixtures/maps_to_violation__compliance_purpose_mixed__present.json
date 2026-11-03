@@ -1,0 +1,48 @@
+{
+  "name": "maps_to_violation__compliance_purpose_mixed__present",
+  "events": [],
+  "world_inputs": {
+    "subjects": [],
+    "pointers": [
+      {
+        "id": "CM-T1",
+        "source": "T-1@1",
+        "target": "TEST@1",
+        "type": "maps_to",
+        "preserves": [
+          [
+            "operations",
+            "AC"
+          ],
+          [
+            "compliance",
+            "AC"
+          ],
+          [
+            "compliance",
+            "verification"
+          ]
+        ]
+      }
+    ],
+    "nodes": [],
+    "regulation_requirements": [
+      {
+        "ref": "T-1@1",
+        "regulation": "TEST",
+        "duty_id": "T-1",
+        "duty_version": "1"
+      }
+    ],
+    "matrix_subjects": [],
+    "signals": [],
+    "open_challenges": []
+  },
+  "expected_open_items": [],
+  "expected_relation_violations": [
+    [
+      "CM-T1",
+      "maps_to_compliance_purpose_invalid"
+    ]
+  ]
+}

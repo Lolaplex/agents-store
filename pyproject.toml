@@ -44,4 +44,9 @@ where = ["src"]
 
 [tool.setuptools.package-data]
 agents_store = ["*.sql"]
-"agents_store.more" = ["*.sql", "kernel-proposal.json", "profiles/*.json"]
+"agents_store.more" = [
+  "*.sql",
+  "kernel-proposal.json",
+  "profiles/*.json",
+  "replay_contract/**",
+]

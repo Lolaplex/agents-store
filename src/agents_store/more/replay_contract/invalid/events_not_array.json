@@ -1,0 +1,14 @@
+{
+  "name": "events_not_array",
+  "events": {},
+  "world_inputs": {
+    "pointers": [],
+    "nodes": [],
+    "subjects": [],
+    "signals": [],
+    "open_challenges": [],
+    "matrix_subjects": [],
+    "regulation_requirements": []
+  },
+  "expected_open_items": []
+}

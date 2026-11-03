@@ -1,0 +1,62 @@
+{
+  "name": "claim_unmet__claim_met__present",
+  "events": [],
+  "world_inputs": {
+    "subjects": [
+      {
+        "ref": "REQ-1@2",
+        "board_kind": "requirement"
+      }
+    ],
+    "pointers": [
+      {
+        "id": "P-S",
+        "source": "REQ-1@2",
+        "target": "SPEC-1@1",
+        "type": "refines"
+      },
+      {
+        "id": "P-2",
+        "source": "REQ-1@2",
+        "target": "TC-1@1",
+        "type": "verifies",
+        "preserves": [
+          [
+            "verification",
+            "value_range"
+          ]
+        ]
+      }
+    ],
+    "nodes": [
+      {
+        "id": "AC-R",
+        "level": "AC",
+        "parent": "REQ-1",
+        "sections": {
+          "AC": "Met when verified."
+        }
+      },
+      {
+        "id": "REQ-1",
+        "level": "Anwendungsfall",
+        "parent": "FG-1",
+        "sections": {
+          "Anwendungsfall": "Requirement text."
+        }
+      }
+    ],
+    "signals": [],
+    "open_challenges": [],
+    "matrix_subjects": [],
+    "regulation_requirements": []
+  },
+  "expected_open_items": [
+    {
+      "board_kind": "requirement",
+      "subject": "REQ-1",
+      "reason": "claim_unmet",
+      "detail": "P-2"
+    }
+  ]
+}

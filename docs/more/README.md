@@ -14,6 +14,13 @@ inputs). `kernel-proposal.json` is a **byte-identical** copy of
 in code as `MORE_FRAMEWORK_PIN` and `KERNEL_PROPOSAL_SHA256` in
 `registry.py`.
 
+**Replay contract** (`replay/fixtures`, `replay/invalid`, `replay/mcdc.json`) is
+vendored under `src/agents_store/more/replay_contract/` at the same pin, with
+`MANIFEST.sha256` checked on every CI run (`scripts/sync_more_replay.py
+--verify-only`). Refresh from upstream with `REPO_READ_TOKEN` or `GITHUB_TOKEN`
+and `python3 scripts/sync_more_replay.py`. Store integration replays through the
+MORe domain provider (`tests/replay/`).
+
 | agents-store | more-framework @ `bb37b5d` |
 |---|---|
 | `src/agents_store/more/*.py` | `companion/python/more_kernel/*.py` |

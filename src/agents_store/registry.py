@@ -32,9 +32,11 @@ DOMAIN_GROUP = "agents_store.domains"
 
 # Pin: Cypoe/more-framework@bb37b5d lean-model/kernel-proposal.json (byte-identical vendored copy).
 MORE_FRAMEWORK_PIN = "bb37b5d8d859415202e0f07c67238696f2e86605"
+MORE_FRAMEWORK_REPLAY_REPO = "Cypoe/more-framework"
 KERNEL_PROPOSAL_SHA256 = (
     "85fe02422511058b341fe2c9303fdd377a6914afd6cbc9a9318f457c6ffb24cb"
 )
+REPLAY_MCDC_SHA256 = "b96caaa9f36f84895976ea53f940f732adf0b23e84de552b41cf20a779f65503"
 
 _KERNEL_ID_LIST_KEYS = (
     "violations",
@@ -80,6 +82,49 @@ def kernel_proposal_sha256() -> str:
     """SHA-256 of the vendored kernel-proposal.json bytes."""
     data = files("agents_store.more").joinpath("kernel-proposal.json").read_bytes()
     return hashlib.sha256(data).hexdigest()
+
+
+def replay_contract_root():
+    """Directory containing vendored replay/fixtures from more-framework."""
+    return files("agents_store.more").joinpath("replay_contract")
+
+
+def verify_replay_contract_manifest() -> list[str]:
+    """Return errors if MANIFEST.sha256 does not match replay_contract files."""
+    root = replay_contract_root()
+    manifest = root.joinpath("MANIFEST.sha256")
+    if not manifest.is_file():
+        return ["replay_contract/MANIFEST.sha256 missing"]
+    errs: list[str] = []
+    lines = manifest.read_text(encoding="utf-8").splitlines()
+    for line in lines:
+        if not line.strip():
+            continue
+        digest, _, rel = line.partition("  ")
+        if not rel:
+            errs.append(f"bad manifest line: {line!r}")
+            continue
+        path = root.joinpath(rel)
+        if not path.is_file():
+            errs.append(f"replay_contract/{rel} missing")
+            continue
+        if rel == "MANIFEST.sha256":
+            body = "\n".join(ln for ln in lines if not ln.endswith("  MANIFEST.sha256"))
+            if body:
+                body += "\n"
+            got = hashlib.sha256(body.encode("utf-8")).hexdigest()
+        else:
+            got = hashlib.sha256(path.read_bytes()).hexdigest()
+        if got != digest:
+            errs.append(f"replay_contract/{rel}: sha256 mismatch")
+    mcdc = root.joinpath("mcdc.json")
+    if mcdc.is_file():
+        got = hashlib.sha256(mcdc.read_bytes()).hexdigest()
+        if got != REPLAY_MCDC_SHA256:
+            errs.append(
+                f"replay_contract/mcdc.json: expected sha256 {REPLAY_MCDC_SHA256}, got {got}"
+            )
+    return errs
 
 
 @lru_cache(maxsize=1)

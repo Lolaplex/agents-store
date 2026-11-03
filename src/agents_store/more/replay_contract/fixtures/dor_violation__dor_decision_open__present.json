@@ -1,0 +1,73 @@
+{
+  "name": "dor_violation__dor_decision_open__present",
+  "events": [
+    {
+      "id": 1,
+      "type": "decision",
+      "actor": "did:example:fabian",
+      "at_ms": 1000,
+      "subjects": [
+        "UC-1"
+      ],
+      "pinned_against": [
+        {
+          "ref": "UC-1@1"
+        }
+      ],
+      "body": {
+        "status": "open"
+      }
+    }
+  ],
+  "world_inputs": {
+    "subjects": [
+      {
+        "ref": "UC-1@1",
+        "board_kind": "use_case"
+      }
+    ],
+    "pointers": [
+      {
+        "id": "P-S",
+        "source": "UC-1@1",
+        "target": "SPEC-1@1",
+        "type": "refines"
+      }
+    ],
+    "nodes": [
+      {
+        "id": "AC-1",
+        "level": "AC",
+        "parent": "UC-1",
+        "sections": {
+          "AC": "Office confirms receipt."
+        }
+      },
+      {
+        "id": "UC-1",
+        "level": "Anwendungsfall",
+        "parent": "FG-1",
+        "sections": {
+          "Anwendungsfall": "File online."
+        }
+      }
+    ],
+    "signals": [],
+    "open_challenges": [],
+    "matrix_subjects": [],
+    "regulation_requirements": []
+  },
+  "expected_open_items": [
+    {
+      "board_kind": "use_case",
+      "subject": "UC-1",
+      "reason": "decision_open"
+    },
+    {
+      "board_kind": "use_case",
+      "subject": "UC-1",
+      "reason": "dor_violation",
+      "detail": "dor_decision_open"
+    }
+  ]
+}
