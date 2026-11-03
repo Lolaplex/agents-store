@@ -30,7 +30,8 @@ def list_domains(reg: Registry | None = None) -> list[dict[str, Any]]:
     out: list[dict[str, Any]] = []
     for name in sorted(reg.domains):
         d = reg.domains[name]
-        registry = d.violation_registry()
+        registry_fn = getattr(d, "violation_registry", None)
+        registry = registry_fn() if callable(registry_fn) else ()
         out.append({
             "name": d.name,
             "write_ops": list(d.write_ops()),

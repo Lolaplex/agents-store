@@ -36,8 +36,7 @@ class MoreDomain:
         return ()
 
     def refusal_ids(self) -> Sequence[str]:
-        kernel = tuple(v.id for v in self.violation_registry())
-        return _STATIC_REFUSALS + kernel
+        return _STATIC_REFUSALS
 
     def violation_registry(self) -> Sequence[DomainViolationId]:
         return more_violation_registry()

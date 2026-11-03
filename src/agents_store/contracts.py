@@ -142,6 +142,9 @@ class DomainProvider(Protocol):
 
     agents-store is the semantic kernel (minted IDs, datoms, grants,
     mediators). Domains (MORe, POSIX, calendar, …) register as providers.
+
+    Optional: ``violation_registry()`` may return kernel violation metadata
+    for ids the provider projects in read/replay paths (not WriteRefusal).
     """
 
     name: str
@@ -156,10 +159,6 @@ class DomainProvider(Protocol):
 
     def refusal_ids(self) -> Sequence[str]:
         """Snake_case reason ids this domain may return on WriteRefusal."""
-        ...
-
-    def violation_registry(self) -> Sequence[DomainViolationId]:
-        """Kernel violation metadata this provider enforces (MORe product-management ids)."""
         ...
 
     def append(
