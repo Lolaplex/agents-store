@@ -111,6 +111,26 @@ class TestAppendSurface(unittest.TestCase):
         self.assertEqual(len(rows), 1)
         self.assertEqual(rows[0]["name"], "more")
         self.assertEqual(rows[0]["write_ops"], ["append"])
+        self.assertIn("violation_registry", rows[0])
+        self.assertGreater(len(rows[0]["violation_registry"]), 0)
+
+    def test_list_domains_without_violation_registry(self):
+        class Minimal:
+            name = "minimal"
+            def write_ops(self):
+                return ("append",)
+            def read_ops(self):
+                return ()
+            def refusal_ids(self):
+                return ("bad_payload",)
+            def append(self, conn, payload, actor):
+                raise AssertionError("must not be called")
+
+        reg = Registry()
+        reg.register_domain(Minimal())
+        rows = list_domains(reg)
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]["violation_registry"], [])
 
 
 class TestCLI(unittest.TestCase):

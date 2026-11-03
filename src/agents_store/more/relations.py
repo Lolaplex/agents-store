@@ -12,7 +12,7 @@ equivB).
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Iterable
+from typing import TYPE_CHECKING, Iterable
 
 from .compliance import (
     COMPLIANCE_PURPOSE,
@@ -24,8 +24,12 @@ from .compliance import (
     maps_to_regulation_target,
 )
 from .events import Event, is_pinned, parse_ref
+from .hierarchy import Node
 from .profile import Profile, load_profile
 from .status import _events, _gate_accepted, _inactive
+
+if TYPE_CHECKING:
+    from .world_model import SubjectKind
 
 
 # RelType.reverse (kernel-proposal.json layers.relations.types)
@@ -49,6 +53,50 @@ REL_TYPE_REVERSE: dict[str, str] = {
 POINTER_UNPINNED = "pointer_unpinned"
 POINTER_SUSPECT = "pointer_suspect"
 CLAIM_UNMET = "claim_unmet"
+REFINES_PURPOSE = "refines"
+REFINES_MEANING_MISSING = "refines_meaning_missing"
+REFINES_PAIR_NOT_IN_PROFILE = "refines_pair_not_in_profile"
+REFINES_LEVEL_INVALID = "refines_level_invalid"
+
+KNOWN_REFINES_ARTIFACT_KINDS = frozenset({
+    "need", "requirement", "spec_element", "rule", "task", "domain", "use_case",
+    "business_process", "conceptual_model", "ui_spec", "api_spec", "test_case",
+    "acceptance_criterion", "decision",
+})
+
+REFINES_IA_LEVEL_RANK = {
+    "Fachgebiet": 0,
+    "Anwendungsfall": 1,
+    "BP": 2,
+    "CM": 3,
+    "UI": 4,
+    "API": 4,
+    "TC": 5,
+    "AC": 6,
+}
+
+KIND_TO_IA_LEVEL = {
+    "domain": "Fachgebiet",
+    "use_case": "Anwendungsfall",
+    "business_process": "BP",
+    "conceptual_model": "CM",
+    "ui_spec": "UI",
+    "api_spec": "API",
+    "test_case": "TC",
+    "acceptance_criterion": "AC",
+}
+
+LEVEL_ARTIFACT_KIND = {
+    "Fachgebiet": "domain",
+    "Anwendungsfall": "use_case",
+    "BP": "business_process",
+    "CM": "conceptual_model",
+    "UI": "ui_spec",
+    "API": "api_spec",
+    "TC": "test_case",
+    "AC": "acceptance_criterion",
+    "DEC": "decision",
+}
 
 # RelType.claim. Types not listed claim nothing.
 CLAIM = {
@@ -149,12 +197,116 @@ def _maps_to_target_mismatch(reqs: list[RegulationRequirement], ptr: Pointer) ->
     return ptr.floating or ptr.target != maps_to_regulation_target(req)
 
 
+def _refines_meaning_from_preserves(ps: tuple[tuple[str, str], ...]) -> str | None:
+    hits = [prop for purp, prop in ps if purp == REFINES_PURPOSE and prop in ("detail_existing", "toward_target")]
+    if len(hits) == 1:
+        return hits[0]
+    return None
+
+
+def _id_prefix_kind(subject: str) -> str | None:
+    if subject.startswith("NEED-"):
+        return "need"
+    if subject.startswith("REQ-"):
+        return "requirement"
+    if subject.startswith("SPEC-"):
+        return "spec_element"
+    if subject.startswith("RULE-"):
+        return "rule"
+    if subject.startswith("DEC-"):
+        return "decision"
+    if subject.startswith("TC-"):
+        return "test_case"
+    if subject.startswith("AC-"):
+        return "acceptance_criterion"
+    if subject.startswith(("WI-", "CODE-")):
+        return "task"
+    if subject.startswith("RISK-"):
+        return "risk"
+    return None
+
+
+def _artifact_kind(subject: str, *, kinds: dict[str, str], nodes: tuple[Node, ...]) -> str | None:
+    if subject in kinds:
+        return kinds[subject]
+    for n in nodes:
+        if n.id == subject:
+            return LEVEL_ARTIFACT_KIND.get(n.level)
+    return _id_prefix_kind(subject)
+
+
+def _ia_level_rank(subject: str, *, kinds: dict[str, str], nodes: tuple[Node, ...]) -> int | None:
+    for n in nodes:
+        if n.id == subject:
+            if n.level == "DEC":
+                return None
+            return REFINES_IA_LEVEL_RANK.get(n.level)
+    k = _artifact_kind(subject, kinds=kinds, nodes=nodes)
+    if k is None:
+        return None
+    level_key = KIND_TO_IA_LEVEL.get(k)
+    if level_key is None:
+        return None
+    return REFINES_IA_LEVEL_RANK.get(level_key)
+
+
+def _normalize_refines_allowed_pairs(pairs: object) -> frozenset[tuple[str, str]]:
+    """JSON profile settings store pairs as lists; normalise for membership tests."""
+    out: set[tuple[str, str]] = set()
+    if not isinstance(pairs, (list, tuple)):
+        return frozenset()
+    for p in pairs:
+        if isinstance(p, (list, tuple)) and len(p) == 2:
+            out.add((str(p[0]), str(p[1])))
+    return frozenset(out)
+
+
+def _refines_pair_allowed(profile: Profile, src: str, tgt: str) -> bool:
+    pairs = profile.settings.get("refines_allowed_pairs")
+    if pairs is not None:
+        return (src, tgt) in _normalize_refines_allowed_pairs(pairs)
+    if src not in KNOWN_REFINES_ARTIFACT_KINDS or tgt not in KNOWN_REFINES_ARTIFACT_KINDS:
+        return False
+    if src == tgt:
+        return bool(profile.settings.get("refines_allow_same_kind", False))
+    return True
+
+
+def _refines_relation_violations(
+    ptr: Pointer,
+    profile: Profile,
+    *,
+    kinds: dict[str, str],
+    nodes: tuple[Node, ...],
+) -> list[str]:
+    if ptr.type != "refines":
+        return []
+    out: list[str] = []
+    if _refines_meaning_from_preserves(ptr.preserves) is None:
+        out.append(REFINES_MEANING_MISSING)
+    src_sub, _ = parse_ref(ptr.source)
+    tgt_sub, _ = parse_ref(ptr.target)
+    sk = _artifact_kind(src_sub, kinds=kinds, nodes=nodes)
+    tk = _artifact_kind(tgt_sub, kinds=kinds, nodes=nodes)
+    if sk is None or tk is None or not _refines_pair_allowed(profile, sk, tk):
+        out.append(REFINES_PAIR_NOT_IN_PROFILE)
+    meaning = _refines_meaning_from_preserves(ptr.preserves)
+    if meaning == "detail_existing":
+        sr = _ia_level_rank(src_sub, kinds=kinds, nodes=nodes)
+        tr = _ia_level_rank(tgt_sub, kinds=kinds, nodes=nodes)
+        if sr is not None and tr is not None and tr > sr:
+            out.append(REFINES_LEVEL_INVALID)
+    return out
+
+
 def relation_violations(
     source,
     ptr: Pointer,
     profile: Profile,
     *,
     regulation_requirements: list[RegulationRequirement] | None = None,
+    subject_kinds: tuple[SubjectKind, ...] = (),
+    nodes: tuple[Node, ...] = (),
 ) -> list[str]:
     reqs = regulation_requirements or []
     out = []
@@ -171,6 +323,8 @@ def relation_violations(
             out.append(PRESERVES_MISSING)
     elif ptr.type in NEEDS_PRESERVES and not ptr.preserves:
         out.append(PRESERVES_MISSING)
+    kind_map = {parse_ref(sk.ref)[0]: sk.board_kind for sk in subject_kinds}
+    out.extend(_refines_relation_violations(ptr, profile, kinds=kind_map, nodes=nodes))
     if not claim_met(source, ptr, profile):
         out.append(CLAIM_UNMET)
     return out
@@ -182,12 +336,17 @@ def relation_check(
     profile: Profile,
     *,
     regulation_requirements: list[RegulationRequirement] | None = None,
+    subject_kinds: tuple[SubjectKind, ...] = (),
+    nodes: tuple[Node, ...] = (),
 ) -> list[tuple[str, str]]:
     return [
         (p.id, v)
         for p in pointers
         for v in relation_violations(
-            source, p, profile, regulation_requirements=regulation_requirements
+            source, p, profile,
+            regulation_requirements=regulation_requirements,
+            subject_kinds=subject_kinds,
+            nodes=nodes,
         )
     ]
 

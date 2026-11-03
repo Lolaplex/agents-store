@@ -142,6 +142,9 @@ class DomainProvider(Protocol):
 
     agents-store is the semantic kernel (minted IDs, datoms, grants,
     mediators). Domains (MORe, POSIX, calendar, …) register as providers.
+
+    Optional: ``violation_registry()`` may return kernel violation metadata
+    for ids the provider projects in read/replay paths (not WriteRefusal).
     """
 
     name: str

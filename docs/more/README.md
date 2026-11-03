@@ -6,11 +6,10 @@ The Python MORe v4 companion from [Cypoe/more-framework](https://github.com/Cypo
 
 Companion modules and `kernel-proposal.json` match
 [Cypoe/more-framework](https://github.com/Cypoe/more-framework) **`master`**
-at **`bb37b5d8d859415202e0f07c67238696f2e86605`** (merge of PR #18 regulation
-`maps_to` / `regulation_requirement` and PR #20 compliance derivation from
-inputs). `kernel-proposal.json` is a **byte-identical** copy of
+at **`504c85f2854a66da9d4cb165f3559cd13c855ec2`** (merge of PR #21 refines
+pointer shape / §16). `kernel-proposal.json` is a **byte-identical** copy of
 `lean-model/kernel-proposal.json` at that commit (sha256
-`85fe02422511058b341fe2c9303fdd377a6914afd6cbc9a9318f457c6ffb24cb`). Recorded
+`3ffd00015b398ede4d5f7da852a98732cb48d3490a09eee66b5a4201e30070ec`). Recorded
 in code as `MORE_FRAMEWORK_PIN` and `KERNEL_PROPOSAL_SHA256` in
 `registry.py`.
 
@@ -21,7 +20,7 @@ vendored under `src/agents_store/more/replay_contract/` at the same pin, with
 and `python3 scripts/sync_more_replay.py`. Store integration replays through the
 MORe domain provider (`tests/replay/`).
 
-| agents-store | more-framework @ `bb37b5d` |
+| agents-store | more-framework @ `504c85f` |
 |---|---|
 | `src/agents_store/more/*.py` | `companion/python/more_kernel/*.py` |
 | `src/agents_store/more/kernel-proposal.json` | `lean-model/kernel-proposal.json` |

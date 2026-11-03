@@ -53,7 +53,13 @@
         "id": "P-S",
         "source": "AC-1@1",
         "target": "SPEC-1@1",
-        "type": "refines"
+        "type": "refines",
+        "preserves": [
+          [
+            "refines",
+            "toward_target"
+          ]
+        ]
       },
       {
         "id": "CM-T-1",

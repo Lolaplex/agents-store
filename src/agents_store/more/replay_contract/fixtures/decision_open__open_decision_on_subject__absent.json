@@ -13,7 +13,13 @@
         "id": "P-S",
         "source": "UC-1@1",
         "target": "SPEC-1@1",
-        "type": "refines"
+        "type": "refines",
+        "preserves": [
+          [
+            "refines",
+            "toward_target"
+          ]
+        ]
       }
     ],
     "nodes": [

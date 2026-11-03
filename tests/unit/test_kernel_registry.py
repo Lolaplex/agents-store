@@ -15,7 +15,7 @@ from agents_store.registry import (
 
 class KernelRegistry(unittest.TestCase):
     def test_more_framework_pin_recorded(self):
-        self.assertEqual(MORE_FRAMEWORK_PIN, "bb37b5d8d859415202e0f07c67238696f2e86605")
+        self.assertEqual(MORE_FRAMEWORK_PIN, "504c85f2854a66da9d4cb165f3559cd13c855ec2")
 
     def test_kernel_proposal_byte_identity(self):
         self.assertEqual(kernel_proposal_sha256(), KERNEL_PROPOSAL_SHA256)
@@ -35,6 +35,9 @@ class KernelRegistry(unittest.TestCase):
             "maps_to_target_mismatch",
             "maps_to_compliance_purpose_invalid",
             "preserves_missing",
+            "refines_meaning_missing",
+            "refines_pair_not_in_profile",
+            "refines_level_invalid",
         ):
             self.assertIn(vid, ids)
 

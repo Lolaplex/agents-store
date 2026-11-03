@@ -9,7 +9,8 @@ import sqlite3
 from dataclasses import dataclass
 from typing import Any, Mapping, Sequence
 
-from agents_store.contracts import WriteRefusal
+from agents_store.contracts import DomainViolationId, WriteRefusal
+from agents_store.domains.more_violations import more_violation_registry
 from agents_store.more.events import EVENT_TYPES, Event
 from agents_store.more.log import EventLog, Refused
 from agents_store.more.store_bridge import StoreWriteRefused
@@ -36,6 +37,9 @@ class MoreDomain:
 
     def refusal_ids(self) -> Sequence[str]:
         return _STATIC_REFUSALS
+
+    def violation_registry(self) -> Sequence[DomainViolationId]:
+        return more_violation_registry()
 
     def append(
         self,

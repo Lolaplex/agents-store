@@ -24,7 +24,7 @@ NODES = [
     Node("AC-7", "AC", "WI-7", {"AC": "Accepted when the office confirms receipt."}),
     Node("UI-7", "UI", "WI-7", {"UI": "Form with period and amount."}),
 ]
-SPEC_PTR = Pointer("P-S", WI, SPEC, "refines")
+SPEC_PTR = Pointer("P-S", WI, SPEC, "refines", (("refines", "toward_target"),))
 IMPL_PTR = Pointer("P-I", WI, CODE, "implements", (("verification", "value_range"),))
 BOTH = [SPEC_PTR, IMPL_PTR]
 
