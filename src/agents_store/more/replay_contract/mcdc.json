@@ -123,6 +123,35 @@
           "differs_in": ["world_inputs.pointers"]
         }
       }
+    },
+    "refines_violation": {
+      "conditions": {
+        "meaning_missing": {
+          "when_true": "refines_violation__meaning_missing__present",
+          "when_false": "refines_violation__meaning_missing__absent",
+          "differs_in": ["world_inputs.pointers"]
+        },
+        "pair_not_in_profile": {
+          "when_true": "refines_violation__pair_not_in_profile__present",
+          "when_false": "refines_violation__pair_not_in_profile__absent",
+          "differs_in": ["world_inputs.pointers"]
+        },
+        "level_invalid": {
+          "when_true": "refines_violation__level_invalid__present",
+          "when_false": "refines_violation__level_invalid__absent",
+          "differs_in": ["world_inputs.pointers"]
+        },
+        "pointer_unpinned": {
+          "when_true": "refines_violation__pointer_unpinned__present",
+          "when_false": "refines_violation__pointer_unpinned__absent",
+          "differs_in": ["world_inputs.pointers"]
+        },
+        "pointer_suspect": {
+          "when_true": "refines_violation__pointer_suspect__present",
+          "when_false": "refines_violation__pointer_suspect__absent",
+          "differs_in": ["events"]
+        }
+      }
     }
   }
 }

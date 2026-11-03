@@ -12,7 +12,15 @@ from .compliance import RegulationRequirement, Subject
 from .events import Event
 from .hierarchy import Node
 from .profile import Profile, load_profile
-from .relations import Pointer, relation_check
+from .relations import (
+    POINTER_SUSPECT,
+    POINTER_UNPINNED,
+    REFINES_LEVEL_INVALID,
+    REFINES_MEANING_MISSING,
+    REFINES_PAIR_NOT_IN_PROFILE,
+    Pointer,
+    relation_check,
+)
 from .world_model import (
     OPEN_ITEM_REASONS,
     ComplianceGapRef,
@@ -352,6 +360,8 @@ def project_all_relation_violations(data: ABCMapping[str, Any], profile: Profile
         w.pointers,
         profile,
         regulation_requirements=list(w.regulation_requirements),
+        subject_kinds=tuple(w.subjects),
+        nodes=tuple(w.nodes),
     )
     return [[pid, vid] for pid, vid in pairs]
 
@@ -473,6 +483,17 @@ def mcdc_outcome_spec(reason: str, condition: str) -> tuple[str, str | None]:
 
 
 def mcdc_relation_spec(reason: str, condition: str) -> tuple[str, str]:
+    if reason == "refines_violation":
+        mapping = {
+            "meaning_missing": (REFINES_MEANING_MISSING, "P-R1"),
+            "pair_not_in_profile": (REFINES_PAIR_NOT_IN_PROFILE, "P-R2"),
+            "level_invalid": (REFINES_LEVEL_INVALID, "P-R3"),
+            "pointer_unpinned": (POINTER_UNPINNED, "P-R4"),
+            "pointer_suspect": (POINTER_SUSPECT, "P-R5"),
+        }
+        if condition not in mapping:
+            raise ValueError(condition)
+        return mapping[condition]
     if reason != "maps_to_violation":
         raise ValueError(reason)
     if condition == "target_mismatch":
@@ -520,7 +541,7 @@ def check_mcdc_coverage(
                 except ReplayError as e:
                     errs.append(f"{reason}.{cond}: differs_in check: {e}")
                     continue
-                if reason == "maps_to_violation":
+                if reason in ("maps_to_violation", "refines_violation"):
                     try:
                         vid, pid = mcdc_relation_spec(reason, cond)
                         present_true = relation_violation_present(project_rel(d_true), vid, pid)
@@ -538,7 +559,7 @@ def check_mcdc_coverage(
                         continue
                 if present_true == present_false:
                     label = f"{reason}.{cond}"
-                    if reason == "maps_to_violation":
+                    if reason in ("maps_to_violation", "refines_violation"):
                         vid, pid = mcdc_relation_spec(reason, cond)
                         errs.append(
                             f"{label}: violation {vid!r} on {pid!r} same in {when_true} and {when_false}"

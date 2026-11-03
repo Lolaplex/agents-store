@@ -30,13 +30,13 @@ CAPABILITY_GROUP = "agents_store.capabilities"
 VIOLATION_ID_GROUP = "agents_store.violation_ids"
 DOMAIN_GROUP = "agents_store.domains"
 
-# Pin: Cypoe/more-framework@bb37b5d lean-model/kernel-proposal.json (byte-identical vendored copy).
-MORE_FRAMEWORK_PIN = "bb37b5d8d859415202e0f07c67238696f2e86605"
+# Pin: Cypoe/more-framework@504c85f lean-model/kernel-proposal.json (byte-identical vendored copy).
+MORE_FRAMEWORK_PIN = "504c85f2854a66da9d4cb165f3559cd13c855ec2"
 MORE_FRAMEWORK_REPLAY_REPO = "Cypoe/more-framework"
 KERNEL_PROPOSAL_SHA256 = (
-    "85fe02422511058b341fe2c9303fdd377a6914afd6cbc9a9318f457c6ffb24cb"
+    "3ffd00015b398ede4d5f7da852a98732cb48d3490a09eee66b5a4201e30070ec"
 )
-REPLAY_MCDC_SHA256 = "b96caaa9f36f84895976ea53f940f732adf0b23e84de552b41cf20a779f65503"
+REPLAY_MCDC_SHA256 = "a9adf15b9e1ecf93d38d3005d96872bae4c4f570fa1191c47395cdb2cf07e6b5"
 
 _KERNEL_ID_LIST_KEYS = (
     "violations",

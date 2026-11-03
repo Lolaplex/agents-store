@@ -80,6 +80,8 @@ def project_relation_violations_from_store(
         w.pointers,
         profile,
         regulation_requirements=list(w.regulation_requirements),
+        subject_kinds=tuple(w.subjects),
+        nodes=tuple(w.nodes),
     )
     return [[pid, vid] for pid, vid in pairs]
 

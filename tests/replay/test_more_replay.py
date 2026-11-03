@@ -31,7 +31,7 @@ class MoreReplayContractTests(unittest.TestCase):
             raise unittest.SkipTest("replay_contract manifest: " + "; ".join(errs))
 
     def test_manifest_matches_pin(self) -> None:
-        self.assertEqual(MORE_FRAMEWORK_PIN, "bb37b5d8d859415202e0f07c67238696f2e86605")
+        self.assertEqual(MORE_FRAMEWORK_PIN, "504c85f2854a66da9d4cb165f3559cd13c855ec2")
 
     def test_mcdc_table_has_independence_pairs(self) -> None:
         errs = check_mcdc_coverage()
@@ -53,11 +53,12 @@ class MoreReplayContractTests(unittest.TestCase):
                 "challenge_open",
                 "gap_signal_open",
                 "maps_to_violation",
+                "refines_violation",
             ],
         )
 
     def test_fixture_count(self) -> None:
-        self.assertEqual(len(list_fixture_paths()), 38)
+        self.assertEqual(len(list_fixture_paths()), 48)
 
     def test_fixture_matches_expected_open_items_via_store(self) -> None:
         for path in list_fixture_paths():

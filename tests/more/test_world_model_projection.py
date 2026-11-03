@@ -1,5 +1,5 @@
 """world_model_projection in the vendored kernel-proposal.json (mirror of
-Cypoe/more-framework@bb37b5d8d859415202e0f07c67238696f2e86605, companion/python/more_kernel/world_model.py and
+Cypoe/more-framework@504c85f2854a66da9d4cb165f3559cd13c855ec2, companion/python/more_kernel/world_model.py and
 More/WorldModel.lean). The Python world model is not vendored here; lolaplex-board
 ports it."""
 import json

@@ -158,6 +158,10 @@ class DomainProvider(Protocol):
         """Snake_case reason ids this domain may return on WriteRefusal."""
         ...
 
+    def violation_registry(self) -> Sequence[DomainViolationId]:
+        """Kernel violation metadata this provider enforces (MORe product-management ids)."""
+        ...
+
     def append(
         self,
         conn: Any,

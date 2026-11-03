@@ -97,6 +97,8 @@ class TestAppendSurface(unittest.TestCase):
                 return ("stat",)
             def refusal_ids(self):
                 return ()
+            def violation_registry(self):
+                return ()
             def append(self, conn, payload, actor):
                 raise AssertionError("must not be called")
 

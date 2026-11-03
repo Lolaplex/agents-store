@@ -1,0 +1,75 @@
+{
+  "name": "refines_violation__level_invalid__present",
+  "events": [],
+  "world_inputs": {
+    "subjects": [
+      {
+        "ref": "UC-1@1",
+        "board_kind": "use_case"
+      }
+    ],
+    "pointers": [
+      {
+        "id": "P-S",
+        "source": "UC-1@1",
+        "target": "SPEC-1@1",
+        "type": "refines",
+        "preserves": [
+          [
+            "refines",
+            "toward_target"
+          ]
+        ]
+      },
+      {
+        "id": "P-R3",
+        "source": "UC-1@1",
+        "target": "BP-1@1",
+        "type": "refines",
+        "preserves": [
+          [
+            "refines",
+            "detail_existing"
+          ]
+        ]
+      }
+    ],
+    "nodes": [
+      {
+        "id": "BP-1",
+        "level": "BP",
+        "parent": "UC-1",
+        "sections": {
+          "BP": "Process step."
+        }
+      },
+      {
+        "id": "AC-1",
+        "level": "AC",
+        "parent": "UC-1",
+        "sections": {
+          "AC": "Office confirms receipt."
+        }
+      },
+      {
+        "id": "UC-1",
+        "level": "Anwendungsfall",
+        "parent": "FG-1",
+        "sections": {
+          "Anwendungsfall": "File online."
+        }
+      }
+    ],
+    "signals": [],
+    "open_challenges": [],
+    "matrix_subjects": [],
+    "regulation_requirements": []
+  },
+  "expected_open_items": [],
+  "expected_relation_violations": [
+    [
+      "P-R3",
+      "refines_level_invalid"
+    ]
+  ]
+}

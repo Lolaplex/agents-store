@@ -9,7 +9,8 @@ from agents_store.more.profile import load_profile
 from agents_store.more.ready import (DOR_AC_UNCLEAR, DOR_DEPENDENCY_UNRESOLVED,
                                DOR_LINKED_DECISION_OPEN, DOR_SPEC_RESTATED, dor_violations)
 from agents_store.more.relations import (CLAIM_UNMET, POINTER_SUSPECT, POINTER_UNPINNED,
-                                   PRESERVES_MISSING, Pointer, claim_met, relation_check)
+                                   PRESERVES_MISSING, Pointer, _refines_pair_allowed,
+                                   claim_met, relation_check)
 
 P = load_profile()
 R2, XSD3, TC1 = "REQ-1@2", "XSD-1@3", "TC-1@1"
@@ -54,7 +55,7 @@ class Relations(unittest.TestCase):
 class Dor(unittest.TestCase):
     UC = "UC-1@1"
     NODES = [Node("AC-1", "AC", "UC-1", {"AC": "Accepted when the office confirms receipt."})]
-    SPEC = Pointer("P-S", UC, "SPEC-1@1", "refines")
+    SPEC = Pointer("P-S", UC, "SPEC-1@1", "refines", (("refines", "toward_target"),))
 
     def test_linked_decision_and_dependency(self):
         log = EventLog()
@@ -70,6 +71,25 @@ class Dor(unittest.TestCase):
                       {"Anwendungsfall": "File a return.", "AC": "Accepted on receipt."})]
         self.assertEqual(dor_violations(EventLog(), [self.SPEC], nodes, self.UC, P),
                          [DOR_AC_UNCLEAR, DOR_SPEC_RESTATED])
+
+
+class RefinesProfilePairs(unittest.TestCase):
+    def test_refines_allowed_pairs_from_json_lists(self) -> None:
+        profile = load_profile().with_settings(
+            refines_allowed_pairs=[
+                ["spec_element", "use_case"],
+                ["task", "decision"],
+            ],
+        )
+        self.assertTrue(_refines_pair_allowed(profile, "spec_element", "use_case"))
+        self.assertTrue(_refines_pair_allowed(profile, "task", "decision"))
+        self.assertFalse(_refines_pair_allowed(profile, "task", "spec_element"))
+
+    def test_refines_allow_same_kind(self) -> None:
+        default = load_profile()
+        self.assertFalse(_refines_pair_allowed(default, "spec_element", "spec_element"))
+        allowed = default.with_settings(refines_allow_same_kind=True)
+        self.assertTrue(_refines_pair_allowed(allowed, "spec_element", "spec_element"))
 
 
 if __name__ == "__main__":
