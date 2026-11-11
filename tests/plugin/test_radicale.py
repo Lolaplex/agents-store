@@ -12,11 +12,18 @@ import shutil
 import tempfile
 import unittest
 
-import radicale
-import radicale.config
+try:
+    import radicale
+    import radicale.config
+except ImportError:
+    radicale = None
 
 import agents_store
-from radicale_agents_store import Collection, Storage
+
+if radicale is not None:
+    from radicale_agents_store import Collection, Storage
+else:
+    Collection = Storage = None
 
 VEVENT = """\
 BEGIN:VCALENDAR\r
@@ -101,6 +108,8 @@ def _request(app, method, path, data=None, headers=None):
     return status_box["s"], headers_box["h"], out
 
 
+@unittest.skipUnless(radicale is not None,
+                     "radicale not installed (pip install -e .[acceptance])")
 class PluginTest(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.mkdtemp(prefix="agents-store-test-")
