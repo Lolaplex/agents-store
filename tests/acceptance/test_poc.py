@@ -23,8 +23,11 @@ import unittest
 from pathlib import Path
 from wsgiref.simple_server import WSGIServer, make_server
 
-import radicale
-import radicale.config
+try:
+    import radicale
+    import radicale.config
+except ImportError:
+    radicale = None
 
 import agents_store
 from agents_store import Change
@@ -84,6 +87,8 @@ class QuietHandler:
         return self.base(environ, start_response)
 
 
+@unittest.skipUnless(radicale is not None,
+                     "radicale not installed (pip install -e .[acceptance])")
 class PocCase(unittest.TestCase):
     """Shared live environment: server + store + folder."""
 
