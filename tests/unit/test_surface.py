@@ -254,7 +254,7 @@ class TestMCP(unittest.TestCase):
         ])
         self.assertEqual(len(responses), 4)
         tools = {t["name"] for t in responses[1]["result"]["tools"]}
-        self.assertEqual(tools, {"append", "domains"})
+        self.assertEqual(tools, {"append", "domains", "list", "view", "pane"})
         append_body = json.loads(responses[2]["result"]["content"][0]["text"])
         self.assertTrue(append_body["ok"], append_body)
         self.assertIn("id", append_body)
@@ -292,6 +292,163 @@ class TestMCP(unittest.TestCase):
         ])
         body = json.loads(responses[0]["result"]["content"][0]["text"])
         self.assertTrue(body["ok"], body)
+
+
+class TestWave5RecordsReadPaneAndHelpJson(unittest.TestCase):
+    def test_help_json_exposes_side_effects_and_commands(self):
+        from agents_store.cli import main
+
+        buf = io.StringIO()
+        with mock.patch("sys.stdout", buf):
+            code = main(["--help-json"])
+        self.assertEqual(code, 0)
+        spec = json.loads(buf.getvalue())
+        self.assertEqual(spec["name"], "agents-store")
+        cmds = {c["name"]: c for c in spec["commands"]}
+        self.assertEqual(set(cmds), {"domains", "list", "view", "pane", "append"})
+        self.assertEqual(cmds["domains"]["side_effects"], "read-only")
+        self.assertEqual(cmds["list"]["side_effects"], "read-only")
+        self.assertEqual(cmds["view"]["side_effects"], "read-only")
+        self.assertEqual(cmds["pane"]["side_effects"], "read-only")
+        self.assertEqual(cmds["append"]["side_effects"], "mutating")
+
+    def test_records_cli_round_trip_calendar_task_note_and_panes(self):
+        from agents_store.cli import main
+
+        did = "did:key:z6Mkj6zATKMsnjT8b3z1RkVsh5Wimmp5AeLTNjrwKB2VQxqw"
+        with tempfile.TemporaryDirectory() as td:
+            db = str(Path(td) / "ws.db")
+            env_patch = {"AGENTS_STORE_DB": db, "AGENTS_ACTOR_DID": did}
+
+            def run_cli(*argv: str) -> tuple[int, dict, str]:
+                out = io.StringIO()
+                err = io.StringIO()
+                with mock.patch.dict("os.environ", env_patch):
+                    with mock.patch("sys.stdout", out), mock.patch("sys.stderr", err):
+                        rc = main(list(argv))
+                parsed = json.loads(out.getvalue()) if out.getvalue().strip() else {}
+                return rc, parsed, err.getvalue()
+
+            rc, ev, err = run_cli(
+                "append", "--domain", "records",
+                json.dumps({"kind": "event", "title": "Standup", "when": "2026-12-01T09:00:00Z"}),
+            )
+            self.assertEqual(rc, 0, err)
+            ev_id = ev["id"]
+
+            rc, tk, err = run_cli(
+                "append", "--domain", "records",
+                json.dumps({"kind": "task", "title": "Ship Wave 5", "status": "open"}),
+            )
+            self.assertEqual(rc, 0, err)
+            tk_id = tk["id"]
+
+            rc, nt, err = run_cli(
+                "append", "--domain", "records",
+                json.dumps({"kind": "note", "title": "Design note", "body": "# Hello\n- item 1"}),
+            )
+            self.assertEqual(rc, 0, err)
+            nt_id = nt["id"]
+
+            rc, items_ev, err = run_cli("list", "--kind", "event")
+            self.assertEqual(rc, 0, err)
+            self.assertEqual([r["id"] for r in items_ev["items"]], [ev_id])
+            self.assertEqual(items_ev["items"][0]["actor"], did)
+
+            rc, items_tk, err = run_cli("query", "--kind", "task", "--status", "open")
+            self.assertEqual(rc, 0, err)
+            self.assertEqual([r["id"] for r in items_tk["items"]], [tk_id])
+
+            rc, viewed, err = run_cli("view", ev_id)
+            self.assertEqual(rc, 0, err)
+            self.assertEqual(viewed["entity"]["attrs"]["title"], "Standup")
+            self.assertEqual(viewed["entity"]["actor"], did)
+
+            rc, ical_pane, err = run_cli("pane", ev_id, "--target", "ical")
+            self.assertEqual(rc, 0, err)
+            self.assertIn("BEGIN:VCALENDAR", ical_pane["pane"]["content"])
+            self.assertIn("SUMMARY:Standup", ical_pane["pane"]["content"])
+
+            rc, html_pane, err = run_cli("pane", nt_id, "--target", "html")
+            self.assertEqual(rc, 0, err)
+            self.assertIn("Design note", html_pane["pane"]["content"])
+
+            rc, md_pane, err = run_cli("pane", nt_id, "--target", "markdown")
+            self.assertEqual(rc, 0, err)
+            self.assertIn("title: Design note", md_pane["pane"]["content"])
+
+            # Falsifying: unsupported target returns refusal exit 1
+            rc_bad, _, err_bad = run_cli("pane", ev_id, "--target", "bogus")
+            self.assertEqual(rc_bad, 1)
+            self.assertEqual(json.loads(err_bad)["refusal"]["reason"], "no_capability_path")
+
+            # Falsifying: invalid status & bad instant rejected loudly
+            rc_st, _, err_st = run_cli(
+                "append", "--domain", "records", json.dumps({"kind": "task", "status": "wip"}),
+            )
+            self.assertEqual(rc_st, 1)
+            self.assertEqual(json.loads(err_st)["refusal"]["reason"], "invalid_value")
+
+            # Falsifying: missing --actor AND missing AGENTS_ACTOR_DID exits 2
+            with mock.patch.dict("os.environ", {"AGENTS_STORE_DB": db, "AGENTS_ACTOR_DID": ""}):
+                with mock.patch("sys.stderr", io.StringIO()):
+                    with self.assertRaises(SystemExit) as ctx:
+                        main(["append", "--domain", "records", json.dumps({"body": "x"})])
+                    self.assertNotEqual(ctx.exception.code, 0)
+
+    def test_mcp_read_pane_and_records_actor_non_spoofable(self):
+        from agents_store import mcp_server
+
+        def frame(obj: dict) -> bytes:
+            data = json.dumps(obj).encode("utf-8")
+            return f"Content-Length: {len(data)}\r\n\r\n".encode("ascii") + data
+
+        reqs = [
+            {
+                "jsonrpc": "2.0", "id": 1, "method": "tools/call",
+                "params": {
+                    "name": "append",
+                    "arguments": {
+                        "domain": "records",
+                        "payload": {
+                            "title": "Cal item",
+                            "when": "2026-12-02T14:00:00Z",
+                            "actor": "did:key:spoofed",
+                        },
+                    },
+                },
+            },
+            {
+                "jsonrpc": "2.0", "id": 2, "method": "tools/call",
+                "params": {"name": "list", "arguments": {"kind": "event"}},
+            },
+        ]
+        stdin_data = b"".join(frame(r) for r in reqs)
+        out = io.BytesIO()
+        err = io.StringIO()
+        with tempfile.TemporaryDirectory() as td:
+            db = str(Path(td) / "mcp_rec.db")
+            rc = mcp_server.serve_stdio(db=db, actor=FAB, inp=io.BytesIO(stdin_data), out=out, err=err)
+            self.assertEqual(rc, 0, err.getvalue())
+
+            raw = out.getvalue()
+            resps = []
+            idx = 0
+            while idx < len(raw):
+                hdr_end = raw.index(b"\r\n\r\n", idx)
+                n = int(raw[idx:hdr_end].decode("ascii").split(":", 1)[1].strip())
+                start = hdr_end + 4
+                resps.append(json.loads(raw[start:start + n].decode("utf-8")))
+                idx = start + n
+
+            app_res = json.loads(resps[0]["result"]["content"][0]["text"])
+            self.assertTrue(app_res["ok"], app_res)
+            eid = app_res["id"]
+
+            list_res = json.loads(resps[1]["result"]["content"][0]["text"])
+            self.assertTrue(list_res["ok"])
+            self.assertEqual(list_res["items"][0]["id"], eid)
+            self.assertEqual(list_res["items"][0]["actor"], FAB)
 
 
 if __name__ == "__main__":
