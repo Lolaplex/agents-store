@@ -9,7 +9,8 @@ import unittest
 from agents_store import Change, connect
 from agents_store.code_hash import code_hash_for_impl_ref
 from agents_store.grant import grant
-from agents_store.ingest import cursor, ingest, ops_since
+from agents_store.ingest import (
+    ResyncRequired, cursor, ingest, ops_since)
 from agents_store.scrub import scrub_datoms, scrub_entity
 from agents_store.store import Store
 
@@ -194,6 +195,182 @@ class TestMigrationV6(unittest.TestCase):
         ingest(conn, "nodeB", 1, "0000000000099.00000.nodeB",
                [(e, "title", "synced", True)])
         self.assertEqual(Store(conn).view(e), {"title": "synced"})
+
+
+class TestFrontierRules(unittest.TestCase):
+    def setUp(self):
+        self.ca, self.sa = make_node("nodeA")
+        self.cb, self.sb = make_node("nodeB")
+
+    def test_boot_seeded_clock_orders_after_restart(self):
+        r = self.sa.transact([Change(e=None, a="title", v="x")], wrapper="test")
+        hlc1 = ops_since(self.ca, 0)[-1]["hlc"]
+        # a fresh Store on the same conn resumes the clock, never rewinds it
+        s2 = Store(self.ca, "nodeA")
+        r2 = s2.transact([Change(e=r.entity, a="title", v="y")], wrapper="test")
+        hlc2 = ops_since(self.ca, cursor(self.ca) - 1)[-1]["hlc"]
+        self.assertGreater(hlc2, hlc1)
+
+    def test_ingest_observes_remote_hlc(self):
+        self.sa.transact([Change(e=None, a="title", v="a")], wrapper="test")
+        far = "9999000000000.00000.nodeZ"
+        ingest(self.ca, "nodeZ", 1, far,
+               [("e1", "title", "z", True)], clock=self.sa._clock)
+        self.sa.transact([Change(e=None, a="title", v="b")], wrapper="test")
+        new_hlc = ops_since(self.ca, cursor(self.ca) - 1)[-1]["hlc"]
+        self.assertGreater(new_hlc, far)
+
+    def test_card_one_same_ord_canonicalizes_to_max(self):
+        r = ingest(self.cb, "nodeA", 1, "0000000000050.00000.nodeA",
+                   [("e1", "title", "alpha", True),
+                    ("e1", "title", "omega", True)])
+        self.assertEqual(r.refused, 1)
+        self.assertEqual(Store(self.cb).view("e1"), {"title": "omega"})
+        ref = self.cb.execute(
+            "SELECT reason FROM refusal WHERE reason = 'card_one_same_ord'"
+        ).fetchall()
+        self.assertEqual(len(ref), 1)
+
+    def test_same_eav_retract_wins(self):
+        r = ingest(self.cb, "nodeA", 1, "0000000000050.00000.nodeA",
+                   [("e1", "title", "x", True), ("e1", "title", "x", False)])
+        self.assertEqual(Store(self.cb).view("e1"), {})
+
+    def test_scrub_tombstone_blocks_resurrection(self):
+        e = self.sa.transact([Change(e=None, a="title", v="s")], wrapper="test").entity
+        res = scrub_entity(self.ca, e, ord_key="0000000000100.00000.nodeA")
+        self.assertGreater(res.tx, 0)
+        self.assertEqual(
+            self.ca.execute("SELECT hlc FROM scrubbed WHERE e = ?", (e,)).fetchone()[0],
+            "0000000000100.00000.nodeA")
+        # stale datom for e (ord below tombstone) must be dropped
+        r = ingest(self.ca, "nodeB", 7, "0000000000050.00000.nodeB",
+                   [(e, "title", "zombie", True)])
+        self.assertEqual(r.applied, 0)
+        self.assertFalse(self.sa.exists(e))
+
+    def test_remote_scrub_op_replays_locally(self):
+        e = self.sb.transact([Change(e=None, a="title", v="gone")], wrapper="test").entity
+        r = ingest(self.cb, "nodeA", 5, "0000000000100.00000.nodeA",
+                   [], op="scrub", note=e)
+        self.assertFalse(Store(self.cb).exists(e))
+        self.assertTrue(self.cb.execute(
+            "SELECT 1 FROM scrubbed WHERE e = ?", (e,)).fetchone())
+
+    def test_never_sync_prefixes_blocked_both_directions(self):
+        conn = self.cb
+        conn.execute(
+            "INSERT INTO attr (name, value_type, cardinality) VALUES ('local:pin','text','one')")
+        r = ingest(conn, "nodeA", 1, "0000000000050.00000.nodeA",
+                   [("e1", "local:pin", "x", True)])
+        self.assertEqual(r.refused, 1)
+        # and outbound: ops_since never carries it
+        e = self.sa.transact([Change(e=None, a="title", v="t")], wrapper="test").entity
+        self.ca.execute(
+            "INSERT INTO attr (name, value_type, cardinality) VALUES ('local:x','text','one')")
+        self.sa.transact([Change(e=e, a="local:x", v="1")], wrapper="store")
+        # 'store' wrapper is INTERNAL — writes bypass grant checks? verify via raw
+        for op in ops_since(self.ca, 0):
+            for d in op["datoms"]:
+                self.assertNotEqual(d["a"], "local:x")
+
+    def test_origin_only_tail(self):
+        self.sa.transact([Change(e=None, a="title", v="a")], wrapper="test")
+        ingest(self.ca, "nodeZ", 1, "0000000000050.00000.nodeZ",
+               [("eZ", "title", "z", True)])
+        own = ops_since(self.ca, 0, origin_only=True)
+        self.assertTrue(all(op["origin_actor"] is None for op in own))
+        full = ops_since(self.ca, 0)
+        self.assertGreater(len(full), len(own))
+
+    def test_self_echo_no_phantom_tx(self):
+        self.sa.transact([Change(e=None, a="title", v="a")], wrapper="test")
+        before = self.ca.execute("SELECT COUNT(*) FROM tx").fetchone()[0]
+        r = ingest(self.ca, "nodeA", 1, "0000000000050.00000.nodeA",
+                   [("e1", "title", "a", True)], local_node_id="nodeA")
+        after = self.ca.execute("SELECT COUNT(*) FROM tx").fetchone()[0]
+        self.assertEqual(before, after)
+        self.assertEqual(r.dupes, 1)
+
+    def test_floor_tx_resync(self):
+        self.ca.execute(
+            "INSERT INTO meta (key, value) VALUES ('floor_tx', '10')")
+        with self.assertRaises(ResyncRequired):
+            ops_since(self.ca, 5)
+        self.assertEqual(ops_since(self.ca, 10), [])
+
+
+class TestRealPrev6Db(unittest.TestCase):
+    def test_open_and_migrate(self):
+        """A real pre-v6 store.db on disk must open without crashing —
+        regression for schema.sql index creation running before ALTERs."""
+        import sqlite3, tempfile
+        from pathlib import Path
+        path = Path(tempfile.mkdtemp()) / "old.db"
+        raw = sqlite3.connect(str(path))
+        raw.executescript("""
+            CREATE TABLE entity (id TEXT PRIMARY KEY, created_tx INTEGER NOT NULL);
+            CREATE TABLE attr (name TEXT PRIMARY KEY, value_type TEXT NOT NULL,
+                               cardinality TEXT NOT NULL, doc TEXT NOT NULL DEFAULT '');
+            CREATE TABLE tx (id INTEGER PRIMARY KEY AUTOINCREMENT,
+              ts TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+              agent TEXT, wrapper TEXT,
+              op TEXT NOT NULL CHECK (op IN ('assert','evolve','split','merge','correct','retire')),
+              note TEXT);
+            CREATE TABLE datom (e TEXT NOT NULL, a TEXT NOT NULL, v TEXT NOT NULL,
+              tx INTEGER NOT NULL, added INTEGER NOT NULL, PRIMARY KEY (e,a,v,tx));
+            CREATE TRIGGER datom_no_update BEFORE UPDATE ON datom
+            BEGIN SELECT RAISE(ABORT, 'datom is append-only'); END;
+            CREATE TRIGGER datom_no_delete BEFORE DELETE ON datom
+            BEGIN SELECT RAISE(ABORT, 'datom is append-only'); END;
+            CREATE VIEW v_current AS
+            SELECT d.e, d.a, d.v, MAX(d.tx) AS tx FROM datom d
+            WHERE d.added = 1 AND NOT EXISTS (
+              SELECT 1 FROM datom r WHERE r.e=d.e AND r.a=d.a AND r.v=d.v
+                AND r.added=0 AND r.tx>d.tx) GROUP BY d.e,d.a,d.v;
+            CREATE TABLE lineage (child TEXT NOT NULL, parent TEXT NOT NULL,
+              kind TEXT NOT NULL, tx INTEGER NOT NULL, reason TEXT,
+              PRIMARY KEY (child,parent,kind,tx));
+            CREATE TABLE kind (name TEXT PRIMARY KEY, required TEXT NOT NULL,
+              optional TEXT NOT NULL DEFAULT '[]', derivations TEXT NOT NULL DEFAULT '[]');
+            CREATE TABLE certificate (id INTEGER PRIMARY KEY AUTOINCREMENT,
+              tier TEXT NOT NULL, subject TEXT NOT NULL, ref TEXT NOT NULL,
+              corpus TEXT, result TEXT NOT NULL, code_hash TEXT NOT NULL DEFAULT '',
+              ts TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')));
+            CREATE TABLE wrapper (id TEXT PRIMARY KEY, namespace TEXT NOT NULL,
+              impl_ref TEXT NOT NULL, doc TEXT NOT NULL DEFAULT '');
+            CREATE TABLE grant_ (wrapper TEXT NOT NULL, attr TEXT NOT NULL,
+              certificate_id INTEGER NOT NULL, PRIMARY KEY (wrapper,attr,certificate_id));
+            CREATE TABLE correspondence (id INTEGER PRIMARY KEY AUTOINCREMENT,
+              a_from TEXT NOT NULL, a_to TEXT NOT NULL, kind TEXT NOT NULL,
+              lens_ref TEXT, status TEXT NOT NULL DEFAULT 'proposed',
+              certificate_id INTEGER);
+            CREATE TABLE capability (id TEXT PRIMARY KEY, in_kind TEXT NOT NULL,
+              out_kind TEXT NOT NULL, mode TEXT NOT NULL, impl_ref TEXT NOT NULL,
+              certificate_id INTEGER);
+            CREATE TABLE mediator (id INTEGER PRIMARY KEY AUTOINCREMENT,
+              source TEXT NOT NULL, target TEXT NOT NULL, path TEXT NOT NULL,
+              exactness TEXT NOT NULL, certificate_id INTEGER);
+            CREATE TABLE provenance (out_ref TEXT NOT NULL, in_refs TEXT NOT NULL,
+              mediator_id INTEGER, tx INTEGER);
+            CREATE TABLE refusal (id INTEGER PRIMARY KEY AUTOINCREMENT,
+              ts TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+              wrapper TEXT NOT NULL, entity TEXT, attr TEXT, reason TEXT NOT NULL,
+              payload TEXT);
+            INSERT INTO attr (name,value_type,cardinality) VALUES ('title','text','one');
+            INSERT INTO tx (op,agent) VALUES ('assert','a');
+            INSERT INTO entity VALUES ('e1',1);
+            INSERT INTO datom (e,a,v,tx,added) VALUES ('e1','title','legacy',1,1);
+            PRAGMA user_version = 5;
+        """)
+        raw.close()
+        conn = connect(str(path))  # must not raise 'no such column: ord'
+        self.assertEqual(Store(conn).view("e1"), {"title": "legacy"})
+        ingest(conn, "nodeB", 1, "0000000000099.00000.nodeB",
+               [("e1", "title", "synced", True)])
+        self.assertEqual(Store(conn).view("e1"), {"title": "synced"})
+        ver = conn.execute("PRAGMA user_version").fetchone()[0]
+        self.assertGreaterEqual(ver, 7)
 
 
 if __name__ == "__main__":

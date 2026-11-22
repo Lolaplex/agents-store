@@ -10,6 +10,7 @@ CREATE TABLE IF NOT EXISTS attr (
   name        TEXT PRIMARY KEY,
   value_type  TEXT NOT NULL CHECK (value_type IN ('text','instant','int','bool','ref','json')),
   cardinality TEXT NOT NULL CHECK (cardinality IN ('one','many')),
+  syncable    INTEGER NOT NULL DEFAULT 1 CHECK (syncable IN (0,1)), -- 0 = never leaves the node
   doc         TEXT NOT NULL DEFAULT ''
 );
 
@@ -18,7 +19,7 @@ CREATE TABLE IF NOT EXISTS tx (
   ts      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
   agent   TEXT,
   wrapper TEXT,
-  op      TEXT NOT NULL CHECK (op IN ('assert','evolve','split','merge','correct','retire')),
+  op      TEXT NOT NULL CHECK (op IN ('assert','evolve','split','merge','correct','retire','scrub')),
   note    TEXT,
   hlc           TEXT,    -- ordering key of this tx (local mint or remote origin)
   origin_actor  TEXT,    -- set only for ingested remote ops
@@ -68,6 +69,19 @@ CREATE TABLE IF NOT EXISTS lineage (
   tx     INTEGER NOT NULL REFERENCES tx(id),
   reason TEXT,
   PRIMARY KEY (child, parent, kind, tx)
+);
+
+-- Durable store metadata: floor_tx = compaction horizon for ops_since.
+CREATE TABLE IF NOT EXISTS meta (
+  key   TEXT PRIMARY KEY,
+  value TEXT NOT NULL
+);
+
+-- Hard-delete tombstones: entity scrubbed at ord `hlc`; ingest drops
+-- later-arriving datoms for e with ord <= hlc (no zombie resurrection).
+CREATE TABLE IF NOT EXISTS scrubbed (
+  e   TEXT PRIMARY KEY,
+  hlc TEXT NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS kind (

@@ -5,7 +5,7 @@ import sqlite3
 from importlib import resources
 from pathlib import Path
 
-SCHEMA_VERSION = 6
+SCHEMA_VERSION = 7
 
 _HISTORY_TABLES = (
     "tx", "lineage", "certificate", "grant_", "refusal", "provenance",
@@ -129,6 +129,21 @@ def _migrate_v5(conn: sqlite3.Connection) -> None:
     conn.execute("PRAGMA user_version = 5")
 
 
+def _migrate_v6_pre(conn: sqlite3.Connection) -> None:
+    """Column ALTERs that must exist BEFORE schema.sql runs: the canonical
+    schema creates indexes on datom.ord / tx.origin_* — opening a pre-v6
+    database would otherwise crash with 'no such column' inside
+    executescript."""
+    dcols = {r[1] for r in conn.execute("PRAGMA table_info(datom)")}
+    if dcols and "ord" not in dcols:
+        conn.execute("ALTER TABLE datom ADD COLUMN ord TEXT NOT NULL DEFAULT ''")
+    tcols = {r[1] for r in conn.execute("PRAGMA table_info(tx)")}
+    if tcols and "hlc" not in tcols:
+        conn.execute("ALTER TABLE tx ADD COLUMN hlc TEXT")
+        conn.execute("ALTER TABLE tx ADD COLUMN origin_actor TEXT")
+        conn.execute("ALTER TABLE tx ADD COLUMN origin_seq INTEGER")
+
+
 def _migrate_v6(conn: sqlite3.Connection) -> None:
     """Distributed ordering: datom.ord + tx origin/hlc + ord-keyed v_current.
 
@@ -137,14 +152,7 @@ def _migrate_v6(conn: sqlite3.Connection) -> None:
     """
     if conn.execute("PRAGMA user_version").fetchone()[0] >= 6:
         return
-    dcols = {r[1] for r in conn.execute("PRAGMA table_info(datom)")}
-    if "ord" not in dcols:
-        conn.execute("ALTER TABLE datom ADD COLUMN ord TEXT NOT NULL DEFAULT ''")
-    tcols = {r[1] for r in conn.execute("PRAGMA table_info(tx)")}
-    if "hlc" not in tcols:
-        conn.execute("ALTER TABLE tx ADD COLUMN hlc TEXT")
-        conn.execute("ALTER TABLE tx ADD COLUMN origin_actor TEXT")
-        conn.execute("ALTER TABLE tx ADD COLUMN origin_seq INTEGER")
+    _migrate_v6_pre(conn)
     # backfill rewrites datom rows -> briefly drop the append-only update
     # trigger, restore it right after (same pattern as _migrate_v5)
     conn.execute("DROP TRIGGER IF EXISTS datom_no_update")
@@ -160,12 +168,56 @@ def _migrate_v6(conn: sqlite3.Connection) -> None:
     conn.execute("PRAGMA user_version = 6")
 
 
+def _migrate_v7(conn: sqlite3.Connection) -> None:
+    """op='scrub' + attr.syncable + meta/scrubbed tables (frontier review).
+
+    The tx CHECK list changes -> table rebuild (same pattern as _migrate_v2).
+    """
+    if conn.execute("PRAGMA user_version").fetchone()[0] >= 7:
+        return
+    acols = {r[1] for r in conn.execute("PRAGMA table_info(attr)")}
+    if "syncable" not in acols:
+        conn.execute("ALTER TABLE attr ADD COLUMN syncable INTEGER NOT NULL DEFAULT 1")
+    tx_sql = _table_sql(conn, "tx") or ""
+    if "'scrub'" not in tx_sql:
+        conn.executescript("""
+            PRAGMA foreign_keys=OFF;
+            DROP TRIGGER IF EXISTS tx_no_update;
+            DROP TRIGGER IF EXISTS tx_no_delete;
+            CREATE TABLE tx_new (
+              id      INTEGER PRIMARY KEY AUTOINCREMENT,
+              ts      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+              agent   TEXT,
+              wrapper TEXT,
+              op      TEXT NOT NULL CHECK (op IN ('assert','evolve','split','merge','correct','retire','scrub')),
+              note    TEXT,
+              hlc           TEXT,
+              origin_actor  TEXT,
+              origin_seq    INTEGER
+            );
+            INSERT INTO tx_new
+              SELECT id, ts, agent, wrapper, op, note, hlc, origin_actor, origin_seq FROM tx;
+            DROP TABLE tx;
+            ALTER TABLE tx_new RENAME TO tx;
+            CREATE UNIQUE INDEX IF NOT EXISTS ux_tx_origin ON tx(origin_actor, origin_seq)
+              WHERE origin_actor IS NOT NULL;
+            CREATE TRIGGER IF NOT EXISTS tx_no_update BEFORE UPDATE ON tx
+            BEGIN SELECT RAISE(ABORT, 'tx is append-only'); END;
+            CREATE TRIGGER IF NOT EXISTS tx_no_delete BEFORE DELETE ON tx
+            BEGIN SELECT RAISE(ABORT, 'tx is append-only'); END;
+            PRAGMA foreign_keys=ON;
+        """)
+    conn.executescript(_sql("schema.sql"))
+    conn.execute("PRAGMA user_version = 7")
+
+
 def connect(path: str | Path = ":memory:") -> sqlite3.Connection:
     """Open (or create) a store database. Idempotent: safe on an existing file."""
     conn = sqlite3.connect(str(path), isolation_level=None)
     conn.execute("PRAGMA foreign_keys = ON")
     if str(path) != ":memory:":
         conn.execute("PRAGMA journal_mode = WAL")
+    _migrate_v6_pre(conn)  # column ALTERs before schema.sql index/view exec
     conn.executescript(_sql("schema.sql"))
     conn.executescript(_sql("seed.sql"))
     conn.executescript(
@@ -176,6 +228,7 @@ def connect(path: str | Path = ":memory:") -> sqlite3.Connection:
     _migrate_v4(conn)
     _migrate_v5(conn)
     _migrate_v6(conn)
+    _migrate_v7(conn)
     if conn.execute("PRAGMA user_version").fetchone()[0] < SCHEMA_VERSION:
         conn.execute(f"PRAGMA user_version = {SCHEMA_VERSION}")
     return conn

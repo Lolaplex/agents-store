@@ -47,6 +47,11 @@ def _encode(value_type: str, v: Any) -> str:
     return str(v)
 
 
+def _encode_key(v: Any) -> str:
+    """Hashable key for change dedupe, regardless of value type."""
+    return v if isinstance(v, str) else json.dumps(v, sort_keys=True, separators=(",", ":"))
+
+
 def _decode(value_type: str, s: str) -> Any:
     if value_type == "json":
         return json.loads(s)
@@ -63,6 +68,16 @@ class Store:
         self._specs: dict[str, tuple[str, str]] | None = None
         self._deriving = False  # re-entrancy guard for derive.on_transact
         self._clock = Hlc(node_id)
+        self._seed_clock()
+
+    def _seed_clock(self) -> None:
+        """Resume the hlc from the newest minted key so a restart does not
+        mint keys older than already-recorded history."""
+        row = self.conn.execute(
+            "SELECT hlc FROM tx WHERE hlc IS NOT NULL ORDER BY hlc DESC LIMIT 1"
+        ).fetchone()
+        if row and row[0]:
+            self._clock.observe(row[0])
 
     # ---- writes -------------------------------------------------------
 
@@ -105,6 +120,15 @@ class Store:
             planned.append((ch, wrapper))
         if mediated:
             note = f"{note or ''} | mediated-write via mediator {sorted(mediated)}"
+        # same (e,a,v) can appear twice in one tx (retract + re-assert):
+        # ux_datom_eav_ord is unique, so only the last change may write —
+        # collapse deterministically, last change wins.
+        last_idx: dict[tuple, int] = {}
+        for i, (ch, _) in enumerate(planned):
+            if ch.e is not None:
+                last_idx[(ch.e, ch.a, _encode_key(ch.v))] = i
+        planned = [c for i, c in enumerate(planned)
+                   if c[0].e is None or i == last_idx[(c[0].e, c[0].a, _encode_key(c[0].v))]]
         tx_hlc = self._clock.tick()
         tx_id = self.conn.execute(
             "INSERT INTO tx (op, agent, wrapper, note, hlc) VALUES (?, ?, ?, ?, ?)",
