@@ -25,6 +25,7 @@ from typing import Any, Callable, Iterable, Sequence
 from . import ids
 from .contracts import Change, Datom, WriteRefusal, TxOp
 from .grant import is_writable
+from .hlc import Hlc
 
 
 @dataclass(frozen=True)
@@ -46,6 +47,11 @@ def _encode(value_type: str, v: Any) -> str:
     return str(v)
 
 
+def _encode_key(v: Any) -> str:
+    """Hashable key for change dedupe, regardless of value type."""
+    return v if isinstance(v, str) else json.dumps(v, sort_keys=True, separators=(",", ":"))
+
+
 def _decode(value_type: str, s: str) -> Any:
     if value_type == "json":
         return json.loads(s)
@@ -57,10 +63,21 @@ def _decode(value_type: str, s: str) -> Any:
 
 
 class Store:
-    def __init__(self, conn: sqlite3.Connection):
+    def __init__(self, conn: sqlite3.Connection, node_id: str = "local"):
         self.conn = conn
         self._specs: dict[str, tuple[str, str]] | None = None
         self._deriving = False  # re-entrancy guard for derive.on_transact
+        self._clock = Hlc(node_id)
+        self._seed_clock()
+
+    def _seed_clock(self) -> None:
+        """Resume the hlc from the newest minted key so a restart does not
+        mint keys older than already-recorded history."""
+        row = self.conn.execute(
+            "SELECT hlc FROM tx WHERE hlc IS NOT NULL ORDER BY hlc DESC LIMIT 1"
+        ).fetchone()
+        if row and row[0]:
+            self._clock.observe(row[0])
 
     # ---- writes -------------------------------------------------------
 
@@ -103,9 +120,19 @@ class Store:
             planned.append((ch, wrapper))
         if mediated:
             note = f"{note or ''} | mediated-write via mediator {sorted(mediated)}"
+        # same (e,a,v) can appear twice in one tx (retract + re-assert):
+        # ux_datom_eav_ord is unique, so only the last change may write —
+        # collapse deterministically, last change wins.
+        last_idx: dict[tuple, int] = {}
+        for i, (ch, _) in enumerate(planned):
+            if ch.e is not None:
+                last_idx[(ch.e, ch.a, _encode_key(ch.v))] = i
+        planned = [c for i, c in enumerate(planned)
+                   if c[0].e is None or i == last_idx[(c[0].e, c[0].a, _encode_key(c[0].v))]]
+        tx_hlc = self._clock.tick()
         tx_id = self.conn.execute(
-            "INSERT INTO tx (op, agent, wrapper, note) VALUES (?, ?, ?, ?)",
-            (op, agent, wrapper, note),
+            "INSERT INTO tx (op, agent, wrapper, note, hlc) VALUES (?, ?, ?, ?, ?)",
+            (op, agent, wrapper, note, tx_hlc),
         ).lastrowid
         if tx_changes is not None:
             # internal authority: no derived_attr mediation applies
@@ -125,7 +152,7 @@ class Store:
             elif not self._exists(e):
                 refusals.append(self._refuse(wrapper, e, ch.a, "unknown_entity", ch.v))
                 continue
-            outcome = self._apply(e, ch, tx_id, ch_wrapper)
+            outcome = self._apply(e, ch, tx_id, ch_wrapper, tx_hlc)
             if isinstance(outcome, WriteRefusal):
                 refusals.append(outcome)
             else:
@@ -141,7 +168,7 @@ class Store:
                 self._deriving = False
         return TxResult(tx=tx_id, entity=minted, applied=tuple(applied), refusals=tuple(refusals))
 
-    def _apply(self, e: str, ch: Change, tx_id: int, wrapper: str) -> list[Datom] | WriteRefusal:
+    def _apply(self, e: str, ch: Change, tx_id: int, wrapper: str, ord_key: str) -> list[Datom] | WriteRefusal:
         spec = self._spec(ch.a)
         if spec is None:
             return self._refuse(wrapper, e, ch.a, "unknown_attr", ch.v)
@@ -156,20 +183,26 @@ class Store:
                 return out  # no-op
             if cardinality == "one":
                 for old in current:
-                    self._datom(e, ch.a, old, tx_id, added=False)
+                    self._datom(e, ch.a, old, tx_id, added=False, ord_key=ord_key)
                     out.append(Datom(e, ch.a, _decode(value_type, old), tx_id, False))
-            self._datom(e, ch.a, v_text, tx_id, added=True)
+            self._datom(e, ch.a, v_text, tx_id, added=True, ord_key=ord_key)
             out.append(Datom(e, ch.a, ch.v, tx_id, True))
         else:
             if v_text in [r[1] for r in self._current_rows(e, ch.a)]:
-                self._datom(e, ch.a, v_text, tx_id, added=False)
+                self._datom(e, ch.a, v_text, tx_id, added=False, ord_key=ord_key)
                 out.append(Datom(e, ch.a, ch.v, tx_id, False))
         return out
 
-    def _datom(self, e: str, a: str, v: str, tx_id: int, *, added: bool) -> None:
+    def _datom(self, e: str, a: str, v: str, tx_id: int, *, added: bool,
+               ord_key: str | None = None) -> None:
+        if ord_key is None:
+            row = self.conn.execute(
+                "SELECT hlc FROM tx WHERE id = ?", (tx_id,)
+            ).fetchone()
+            ord_key = row[0] if row and row[0] else ""
         self.conn.execute(
-            "INSERT INTO datom (e, a, v, tx, added) VALUES (?, ?, ?, ?, ?)",
-            (e, a, v, tx_id, 1 if added else 0),
+            "INSERT INTO datom (e, a, v, tx, added, ord) VALUES (?, ?, ?, ?, ?, ?)",
+            (e, a, v, tx_id, 1 if added else 0, ord_key),
         )
 
     def _refuse(self, wrapper: str, e: str | None, a: str | None, reason: str, payload: Any) -> WriteRefusal:

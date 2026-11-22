@@ -16,10 +16,10 @@ from .ids import mint
 from .store import Store, _encode
 
 
-def _tx(conn, op: str, agent: str | None, reason: str | None) -> int:
+def _tx(conn, op: str, agent: str | None, reason: str | None, hlc: str = "") -> int:
     return conn.execute(
-        "INSERT INTO tx (op, agent, wrapper, note) VALUES (?, ?, ?, ?)",
-        (op, agent, INTERNAL_WRAPPER, reason),
+        "INSERT INTO tx (op, agent, wrapper, note, hlc) VALUES (?, ?, ?, ?, ?)",
+        (op, agent, INTERNAL_WRAPPER, reason, hlc or None),
     ).lastrowid
 
 
@@ -46,7 +46,7 @@ def split(store: Store, e: str, into: Sequence[Sequence[str]], *, reason: str,
     view = store.view(e)
     conn.execute("BEGIN")
     try:
-        tx = _tx(conn, "split", agent, reason)
+        tx = _tx(conn, "split", agent, reason, store._clock.tick())
         children = []
         for carry in into:
             child = mint()
@@ -80,7 +80,7 @@ def merge(store: Store, es: Sequence[str], *, reason: str,
     views = [store.view(e) for e in es]
     conn.execute("BEGIN")
     try:
-        tx = _tx(conn, "merge", agent, reason)
+        tx = _tx(conn, "merge", agent, reason, store._clock.tick())
         survivor = mint()
         conn.execute("INSERT INTO entity (id, created_tx) VALUES (?, ?)", (survivor, tx))
         merged: dict[str, list[Any]] = {}
@@ -124,7 +124,7 @@ def correct(store: Store, e: str, supersedes: str, *, reason: str,
             raise ValueError(f"correct: unknown entity {x!r}")
     conn.execute("BEGIN")
     try:
-        tx = _tx(conn, "correct", agent, reason)
+        tx = _tx(conn, "correct", agent, reason, store._clock.tick())
         _edge(conn, e, supersedes, "severs", tx, reason)
         conn.execute("COMMIT")
         return tx
