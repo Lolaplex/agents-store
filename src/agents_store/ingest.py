@@ -55,6 +55,9 @@ def ingest(
         " VALUES (?, ?, ?, ?, ?, ?, ?)",
         (op, actor, INGEST_WRAPPER, note, hlc, actor, seq),
     ).lastrowid
+    # pre-v6 remote ops may carry an empty hlc; fall back to the origin
+    # seq so distinct remote txs still get distinct ordering keys
+    ord_key = hlc or f"{seq:012d}.{actor}"
     applied = dupes = refused = 0
     for e, a, v, added in items:
         if a not in known:
@@ -72,7 +75,7 @@ def ingest(
         cur = conn.execute(
             "INSERT OR IGNORE INTO datom (e, a, v, tx, added, ord)"
             " VALUES (?, ?, ?, ?, ?, ?)",
-            (e, a, v, tx_id, 1 if added else 0, hlc),
+            (e, a, v, tx_id, 1 if added else 0, ord_key),
         )
         if cur.rowcount:
             applied += 1
