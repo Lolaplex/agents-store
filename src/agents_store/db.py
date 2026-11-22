@@ -5,7 +5,7 @@ import sqlite3
 from importlib import resources
 from pathlib import Path
 
-SCHEMA_VERSION = 5
+SCHEMA_VERSION = 6
 
 _HISTORY_TABLES = (
     "tx", "lineage", "certificate", "grant_", "refusal", "provenance",
@@ -129,6 +129,37 @@ def _migrate_v5(conn: sqlite3.Connection) -> None:
     conn.execute("PRAGMA user_version = 5")
 
 
+def _migrate_v6(conn: sqlite3.Connection) -> None:
+    """Distributed ordering: datom.ord + tx origin/hlc + ord-keyed v_current.
+
+    Backfills ord from tx so pre-v6 local history keeps its relative order;
+    every 12-digit backfill key sorts below any minted hlc key.
+    """
+    if conn.execute("PRAGMA user_version").fetchone()[0] >= 6:
+        return
+    dcols = {r[1] for r in conn.execute("PRAGMA table_info(datom)")}
+    if "ord" not in dcols:
+        conn.execute("ALTER TABLE datom ADD COLUMN ord TEXT NOT NULL DEFAULT ''")
+    tcols = {r[1] for r in conn.execute("PRAGMA table_info(tx)")}
+    if "hlc" not in tcols:
+        conn.execute("ALTER TABLE tx ADD COLUMN hlc TEXT")
+        conn.execute("ALTER TABLE tx ADD COLUMN origin_actor TEXT")
+        conn.execute("ALTER TABLE tx ADD COLUMN origin_seq INTEGER")
+    # backfill rewrites datom rows -> briefly drop the append-only update
+    # trigger, restore it right after (same pattern as _migrate_v5)
+    conn.execute("DROP TRIGGER IF EXISTS datom_no_update")
+    try:
+        conn.execute("UPDATE datom SET ord = printf('%012d', tx) WHERE ord = ''")
+    finally:
+        conn.execute(
+            "CREATE TRIGGER IF NOT EXISTS datom_no_update BEFORE UPDATE ON datom "
+            "BEGIN SELECT RAISE(ABORT, 'datom is append-only'); END"
+        )
+    conn.execute("DROP VIEW IF EXISTS v_current")
+    conn.executescript(_sql("schema.sql"))
+    conn.execute("PRAGMA user_version = 6")
+
+
 def connect(path: str | Path = ":memory:") -> sqlite3.Connection:
     """Open (or create) a store database. Idempotent: safe on an existing file."""
     conn = sqlite3.connect(str(path), isolation_level=None)
@@ -144,6 +175,7 @@ def connect(path: str | Path = ":memory:") -> sqlite3.Connection:
     _migrate_v3(conn)
     _migrate_v4(conn)
     _migrate_v5(conn)
+    _migrate_v6(conn)
     if conn.execute("PRAGMA user_version").fetchone()[0] < SCHEMA_VERSION:
         conn.execute(f"PRAGMA user_version = {SCHEMA_VERSION}")
     return conn

@@ -19,8 +19,13 @@ CREATE TABLE IF NOT EXISTS tx (
   agent   TEXT,
   wrapper TEXT,
   op      TEXT NOT NULL CHECK (op IN ('assert','evolve','split','merge','correct','retire')),
-  note    TEXT
+  note    TEXT,
+  hlc           TEXT,    -- ordering key of this tx (local mint or remote origin)
+  origin_actor  TEXT,    -- set only for ingested remote ops
+  origin_seq    INTEGER  -- sender-local tx id, dedupe key with origin_actor
 );
+CREATE UNIQUE INDEX IF NOT EXISTS ux_tx_origin ON tx(origin_actor, origin_seq)
+  WHERE origin_actor IS NOT NULL;
 
 CREATE TABLE IF NOT EXISTS datom (
   e     TEXT    NOT NULL REFERENCES entity(id),
@@ -28,23 +33,33 @@ CREATE TABLE IF NOT EXISTS datom (
   v     TEXT    NOT NULL,
   tx    INTEGER NOT NULL REFERENCES tx(id),
   added INTEGER NOT NULL CHECK (added IN (0,1)),
+  ord   TEXT    NOT NULL DEFAULT '',  -- global ordering key (hlc); '' pre-v6
   PRIMARY KEY (e, a, v, tx)
 );
 CREATE INDEX IF NOT EXISTS idx_datom_av ON datom(a, v);
 CREATE INDEX IF NOT EXISTS idx_datom_tx ON datom(tx);
+CREATE UNIQUE INDEX IF NOT EXISTS ux_datom_eav_ord ON datom(e, a, v, ord);
 
 CREATE TRIGGER IF NOT EXISTS datom_no_update BEFORE UPDATE ON datom
 BEGIN SELECT RAISE(ABORT, 'datom is append-only'); END;
 CREATE TRIGGER IF NOT EXISTS datom_no_delete BEFORE DELETE ON datom
 BEGIN SELECT RAISE(ABORT, 'datom is append-only'); END;
 
+-- Current state = last write per key by global order (datom.ord), not by
+-- arrival seq. cardinality 'one': argmax-ord row per (e,a); 'many':
+-- argmax-ord row per (e,a,v). Convergent under reorder/redelivery.
 CREATE VIEW IF NOT EXISTS v_current AS
-SELECT d.e, d.a, d.v, MAX(d.tx) AS tx
-FROM datom d
-WHERE d.added = 1 AND NOT EXISTS (
-  SELECT 1 FROM datom r
-  WHERE r.e = d.e AND r.a = d.a AND r.v = d.v AND r.added = 0 AND r.tx > d.tx)
-GROUP BY d.e, d.a, d.v;
+SELECT d.e, d.a, d.v, d.tx
+FROM datom d JOIN attr t ON t.name = d.a
+WHERE d.added = 1 AND (
+  (t.cardinality = 'many' AND d.ord = (
+    SELECT MAX(x.ord) FROM datom x
+    WHERE x.e = d.e AND x.a = d.a AND x.v = d.v))
+  OR
+  (t.cardinality = 'one' AND d.ord = (
+    SELECT MAX(y.ord) FROM datom y
+    WHERE y.e = d.e AND y.a = d.a))
+);
 
 CREATE TABLE IF NOT EXISTS lineage (
   child  TEXT    NOT NULL REFERENCES entity(id),
