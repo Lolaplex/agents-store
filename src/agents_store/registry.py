@@ -247,11 +247,22 @@ class Registry:
             raise RegistryError(f"no violation id registered under {vid!r}") from None
 
     def load_entry_points(self) -> None:
-        for ep in entry_points(group=WRAPPER_GROUP):
+        # Editable installs + cwd src/ on sys.path can surface the exact same
+        # (name, value) entry point twice; deduplicate identical targets while
+        # preserving loud collision errors across genuinely distinct plugins.
+        def _unique(group: str):
+            seen: set[tuple[str, str]] = set()
+            for ep in entry_points(group=group):
+                key = (ep.name, ep.value)
+                if key not in seen:
+                    seen.add(key)
+                    yield ep
+
+        for ep in _unique(WRAPPER_GROUP):
             self.register_wrapper(ep.load()())
-        for ep in entry_points(group=CAPABILITY_GROUP):
+        for ep in _unique(CAPABILITY_GROUP):
             self.register_capability(ep.load()())
-        for ep in entry_points(group=VIOLATION_ID_GROUP):
+        for ep in _unique(VIOLATION_ID_GROUP):
             self.register_violation_id(ep.load()())
-        for ep in entry_points(group=DOMAIN_GROUP):
+        for ep in _unique(DOMAIN_GROUP):
             self.register_domain(ep.load()())

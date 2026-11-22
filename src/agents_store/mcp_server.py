@@ -1,7 +1,7 @@
-"""Minimal stdio MCP server (stdlib only). Tools: append, domains.
+"""Minimal stdio MCP server (stdlib only). Tools: append, domains, list, view, pane.
 
-Actor comes from server config (--actor / serve_stdio actor=), never from a
-tool argument. No HTTP. Lean MCP comes later.
+Actor comes from server config (--actor / AGENTS_ACTOR_DID / serve_stdio actor=),
+never from a tool argument. No HTTP.
 """
 from __future__ import annotations
 
@@ -11,7 +11,14 @@ from typing import Any, BinaryIO, TextIO
 
 from . import connect
 from .contracts import WriteRefusal
-from .surface import append, default_registry, list_domains
+from .surface import (
+    append,
+    default_registry,
+    list_domains,
+    query_entities,
+    render_pane,
+    view_entity,
+)
 
 PROTOCOL_VERSION = "2024-11-05"
 SERVER_INFO = {"name": "agents-store", "version": "0.0.1"}
@@ -26,10 +33,10 @@ TOOLS = [
         "inputSchema": {
             "type": "object",
             "properties": {
-                "domain": {"type": "string", "description": "Registered domain name."},
+                "domain": {"type": "string", "description": "Registered domain name (e.g. records, more)."},
                 "payload": {
                     "type": "object",
-                    "description": "Domain payload (for more: event envelope without actor).",
+                    "description": "Domain payload (records or MORe event envelope without actor).",
                 },
             },
             "required": ["domain", "payload"],
@@ -42,6 +49,44 @@ TOOLS = [
         "inputSchema": {
             "type": "object",
             "properties": {},
+            "additionalProperties": False,
+        },
+    },
+    {
+        "name": "list",
+        "description": "List entities currently in the store, optionally filtered by kind or status.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "kind": {"type": "string", "description": "Optional kind filter (event, task, note, decision)."},
+                "status": {"type": "string", "description": "Optional task status filter (open, done)."},
+                "limit": {"type": "integer", "description": "Maximum rows to return (default 100)."},
+            },
+            "additionalProperties": False,
+        },
+    },
+    {
+        "name": "view",
+        "description": "View one entity's materialized attributes, kinds and provenance by ID.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "id": {"type": "string", "description": "Minted entity ID."},
+            },
+            "required": ["id"],
+            "additionalProperties": False,
+        },
+    },
+    {
+        "name": "pane",
+        "description": "Render one entity into a certified target representation (markdown, ical, html, jsoncal).",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "id": {"type": "string", "description": "Minted entity ID."},
+                "target": {"type": "string", "description": "Target representation kind (default: markdown)."},
+            },
+            "required": ["id"],
             "additionalProperties": False,
         },
     },
@@ -85,6 +130,19 @@ def _error(req_id: Any, code: int, message: str) -> dict[str, Any]:
     return {"jsonrpc": "2.0", "id": req_id, "error": {"code": code, "message": message}}
 
 
+def _refusal_dict(r: WriteRefusal) -> dict[str, Any]:
+    return {
+        "ok": False,
+        "refusal": {
+            "wrapper": r.wrapper,
+            "reason": r.reason,
+            "e": r.e,
+            "a": r.a,
+            "payload": r.payload,
+        },
+    }
+
+
 def _tool_text(obj: Any) -> dict[str, Any]:
     return {
         "content": [{"type": "text", "text": json.dumps(obj, sort_keys=True)}],
@@ -102,6 +160,38 @@ def _handle_call(
 ) -> dict[str, Any]:
     if name == "domains":
         return _tool_text({"ok": True, "domains": list_domains(reg)})
+    if name == "list":
+        kind = arguments.get("kind")
+        status = arguments.get("status")
+        limit = arguments.get("limit", 100)
+        if kind is not None and not isinstance(kind, str):
+            return _tool_text({"ok": False, "error": "kind must be a string"})
+        if status is not None and not isinstance(status, str):
+            return _tool_text({"ok": False, "error": "status must be a string"})
+        try:
+            items = query_entities(conn, kind=kind, status=status, limit=int(limit))
+        except (TypeError, ValueError):
+            return _tool_text({"ok": False, "error": "limit must be an integer"})
+        return _tool_text({"ok": True, "items": items})
+    if name == "view":
+        eid = arguments.get("id")
+        if not isinstance(eid, str) or not eid.strip():
+            return _tool_text({"ok": False, "error": "id is required"})
+        res = view_entity(conn, eid.strip())
+        if isinstance(res, WriteRefusal):
+            return _tool_text(_refusal_dict(res))
+        return _tool_text({"ok": True, "entity": res})
+    if name == "pane":
+        eid = arguments.get("id")
+        target = arguments.get("target") or "markdown"
+        if not isinstance(eid, str) or not eid.strip():
+            return _tool_text({"ok": False, "error": "id is required"})
+        if not isinstance(target, str) or not target.strip():
+            return _tool_text({"ok": False, "error": "target must be a non-empty string"})
+        res = render_pane(conn, reg, eid.strip(), target.strip())
+        if isinstance(res, WriteRefusal):
+            return _tool_text(_refusal_dict(res))
+        return _tool_text({"ok": True, "pane": res})
     if name == "append":
         domain = arguments.get("domain")
         payload = arguments.get("payload")
@@ -112,16 +202,7 @@ def _handle_call(
         # Actor is never taken from arguments.
         result = append(domain, payload, actor, conn=conn, reg=reg)
         if isinstance(result, WriteRefusal):
-            return _tool_text({
-                "ok": False,
-                "refusal": {
-                    "wrapper": result.wrapper,
-                    "reason": result.reason,
-                    "e": result.e,
-                    "a": result.a,
-                    "payload": result.payload,
-                },
-            })
+            return _tool_text(_refusal_dict(result))
         return _tool_text({"ok": True, "id": result})
     return _tool_text({"ok": False, "error": f"unknown tool {name!r}"})
 
@@ -140,8 +221,8 @@ def serve_stdio(
     inp = inp or sys.stdin.buffer
     out = out or sys.stdout.buffer
     conn = connect(db)
-    reg = default_registry()
     try:
+        reg = default_registry()
         while True:
             msg = _read_message(inp)
             if msg is None:

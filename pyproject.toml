@@ -35,6 +35,7 @@ acceptance = [
 
 [project.entry-points."agents_store.domains"]
 more = "agents_store.domains.more:factory"
+records = "agents_store.domains.records:factory"
 
 [project.scripts]
 agents-store = "agents_store.cli:main"
