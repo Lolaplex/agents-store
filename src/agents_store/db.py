@@ -211,9 +211,19 @@ def _migrate_v7(conn: sqlite3.Connection) -> None:
     conn.execute("PRAGMA user_version = 7")
 
 
-def connect(path: str | Path = ":memory:") -> sqlite3.Connection:
-    """Open (or create) a store database. Idempotent: safe on an existing file."""
-    conn = sqlite3.connect(str(path), isolation_level=None)
+def connect(
+    path: str | Path = ":memory:",
+    *,
+    check_same_thread: bool = True,
+) -> sqlite3.Connection:
+    """Open (or create) a store database. Idempotent: safe on an existing file.
+
+    check_same_thread=False is for owners that serialize access across
+    threads themselves (e.g. the serve sync worker holds one conn behind
+    a lock shared by the SSE reader and the drain tick).
+    """
+    conn = sqlite3.connect(
+        str(path), isolation_level=None, check_same_thread=check_same_thread)
     conn.execute("PRAGMA foreign_keys = ON")
     if str(path) != ":memory:":
         conn.execute("PRAGMA journal_mode = WAL")

@@ -188,6 +188,7 @@ def ops_since(
     *,
     limit: int = 1000,
     origin_only: bool = False,
+    local_origins: tuple = (),
 ) -> list[dict]:
     """Local log tail for the distributor: every tx > since_tx with its
     datoms and the origin identity the receiver should dedupe on.
@@ -197,7 +198,10 @@ def ops_since(
     re-broadcast dedupes at the fact's true origin.
 
     origin_only=True returns only locally-minted ops (spoke -> hub: never
-    echo foreign ops back to the hub that delivered them).
+    echo foreign ops back to the hub that delivered them). Locally-
+    originated ops may still carry an origin identity — e.g. ingest-based
+    projections stamp `proj:<session>`; pass their prefixes in
+    local_origins so they count as local for the echo filter.
 
     Never-syncable datoms are filtered out at the source. since_tx below
     the compaction floor raises ResyncRequired — caller must snapshot.
@@ -207,7 +211,11 @@ def ops_since(
             f"cursor {since_tx} behind floor_tx {floor_tx(conn)}")
     where = "id > ?"
     if origin_only:
-        where += " AND origin_actor IS NULL"
+        local = "origin_actor IS NULL"
+        for prefix in local_origins:
+            esc = str(prefix).replace("'", "''")
+            local += f" OR origin_actor LIKE '{esc}%'"
+        where += f" AND ({local})"
     rows = conn.execute(
         "SELECT id, agent, wrapper, op, note, hlc, origin_actor, origin_seq, ts"
         f" FROM tx WHERE {where} ORDER BY id LIMIT ?",
