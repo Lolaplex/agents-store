@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- `connect(path, check_same_thread=False)` for owners that serialize one connection across threads themselves.
+- `ops_since(..., local_origins=(prefix, ...))`: ingest-based local projections/imports whose `origin_actor` starts with a listed prefix count as locally minted for the `origin_only` echo filter. Prefix match is parameterized (`substr(origin_actor, 1, ?) = ?`), so quotes and `%`/`_` are literal.
+
 ### Changed
 - Lower `requires-python` floor to `>=3.10`; no 3.11-only syntax in `src/` (the floor had blocked editable installs in the 3.10 MCP environment).
 - Acceptance tests skip cleanly when `radicale` is not installed (Windows dev hosts); EOL pin handling fixed.

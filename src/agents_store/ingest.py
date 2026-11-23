@@ -210,16 +210,24 @@ def ops_since(
         raise ResyncRequired(
             f"cursor {since_tx} behind floor_tx {floor_tx(conn)}")
     where = "id > ?"
+    params: list = [since_tx]
     if origin_only:
+        # Prefix match via substr() with bound parameters: no SQL string
+        # interpolation and no LIKE wildcard semantics (`%`/`_` in a
+        # prefix are literal characters).
         local = "origin_actor IS NULL"
         for prefix in local_origins:
-            esc = str(prefix).replace("'", "''")
-            local += f" OR origin_actor LIKE '{esc}%'"
+            prefix = str(prefix)
+            if not prefix:
+                continue
+            local += " OR substr(origin_actor, 1, ?) = ?"
+            params.extend([len(prefix), prefix])
         where += f" AND ({local})"
+    params.append(limit)
     rows = conn.execute(
         "SELECT id, agent, wrapper, op, note, hlc, origin_actor, origin_seq, ts"
         f" FROM tx WHERE {where} ORDER BY id LIMIT ?",
-        (since_tx, limit),
+        params,
     ).fetchall()
     out = []
     for tx_id, agent, wrapper, op, note, hlc, oa, osq, ts in rows:
