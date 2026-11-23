@@ -10,8 +10,8 @@ and `docs/ROADMAP.md` (see `git diff 04acfaf 2ba8423`). Current
 | Scenario | Setup | Expected invariant | Test / witness | Result |
 |----------|-------|-------------------|----------------|--------|
 | Markdown `id:` edit refused, no mutation | Entity + folder sync; edit `id:` in file | Refusal; canonical attrs unchanged | `test_A8_md_id_edit_refused` | pass |
-| Malformed ICS refused, no partial tx | HTTP PUT bad syntax or TZID | No new entity; no partial datoms | `test_A8_bad_ics_no_partial` | pass |
-| Non-round-trippable RRULE/TZ refused, prior state kept | PUT TZID event | 400 + refusal row; store unchanged | `test_A10_tz_refused`, `test_tz_refusal_http_and_table` | pass |
+| Malformed ICS refused, no partial tx | HTTP PUT bad syntax or unresolvable time | No new entity; no partial datoms | `test_A8_bad_ics_no_partial` | pass |
+| Unresolvable time refused, prior state kept | PUT a TZID wall time the zone skips (DST gap) | 400 + refusal row; store unchanged | `test_A10_tz_refused`, `test_tz_refusal_http_and_table` | pass |
 | Rename keeps same entity | CalDAV MOVE or `md:path` change | Same entity id; href/path is data | `test_A2_caldav_move_propagates`, `test_A3_md_edit_and_rename` | pass |
 | Delete then recreate same path ≠ same identity | DELETE item; PUT same href | New minted entity id | `test_delete_retracts_keeps_history` (history); recreate id covered by store mint semantics + demo idempotency | pass |
 | Restart preserves history | Per-test temp `AGENTS_STORE_SCRATCH` + `demo.sqlite` | Prior datoms readable after reconnect | `test_demo_runs_clean_and_idempotent` | pass |

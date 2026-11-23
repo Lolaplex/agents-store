@@ -45,8 +45,8 @@ _MAPPED_ATTRS = ("title", "status", "when", "end")
 # 'out_of_projection' while the lawful part lands.
 COMPONENT = {"calendar": "VEVENT", "tasks": "VTODO"}
 WRITE_SETS = {
-    "calendar": {"title", "when", "end", "ical:extra"},
-    "tasks": {"title", "status", "when", "end", "ical:extra"},
+    "calendar": {"title", "when", "end", "ical:extra", "ical:tz", "ical:vtimezone"},
+    "tasks": {"title", "status", "when", "end", "ical:extra", "ical:tz", "ical:vtimezone"},
 }
 
 # Deterministic witness corpus for the ical lens: covers VEVENT, VTODO,
@@ -59,6 +59,10 @@ _CORPUS = [
     {"status": "done"},
     {"title": "c", "when": "2026-01-03T00:00:00Z",
      "ical:extra": ["X-POC-FLAG:1"]},
+    {"title": "d", "when": "2026-01-04T09:00:00Z", "end": "2026-01-04T10:00:00Z",
+     "ical:tz": "TZID=Europe/Berlin"},
+    {"title": "e", "when": "2026-01-05T00:00:00Z", "end": "2026-01-06T00:00:00Z",
+     "ical:tz": "date"},
 ]
 
 

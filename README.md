@@ -6,6 +6,14 @@ A thing (an event, a task, a note) is stored once with a minted ID, typed attrib
 
 Status: **POC landed** (tag `poc-v1` @ `e031973`); post-POC cards T13–T17 on `main` — **303 tests** at `e9f470868be05a5031217382bd0aa48583d09737` (159 unit + 15 plugin + 15 acceptance + 114 MORe companion; inventory in `docs/AUDIT.md`). The agents-calendar subprocess witness exercises real CalDAV when the acceptance extra is installed. See [docs/walkthrough.md](docs/walkthrough.md) to run it end to end, [docs/acceptance-matrix.md](docs/acceptance-matrix.md) for criterion status, [docs/tasks/](docs/tasks/README.md) for the task cards, [docs/MEGAPLAN.md](docs/MEGAPLAN.md) for the plan, [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the module map.
 
+## Install
+
+```bash
+pip install agents-store
+```
+
+Python 3.10 or newer. The CalDAV acceptance witness needs the extra: `pip install "agents-store[acceptance]"`. From a checkout: `pip install -e ".[acceptance]" -e plugins/radicale_agents_store`.
+
 ## POC target
 
 One entity with `title`, `when`, `status`, `body` shows up as:
@@ -16,4 +24,4 @@ One entity with `title`, `when`, `status`, `body` shows up as:
 
 An edit in any of them lands in the others. An edit that can't round-trip (an RRULE, a changed `id:`) is refused with a reason.
 
-Stack: Python 3.11 standard library + `sqlite3`. The Radicale plugin is a separate GPLv3 sub-package. The core is MIT.
+Stack: Python 3.10+ standard library + `sqlite3`, plus `blake3` for MORe SAIDs. The Radicale plugin is a separate GPLv3 sub-package. The core is MIT.
