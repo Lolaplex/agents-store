@@ -46,7 +46,7 @@ def split(store: Store, e: str, into: Sequence[Sequence[str]], *, reason: str,
     view = store.view(e)
     conn.execute("BEGIN")
     try:
-        tx = _tx(conn, "split", agent, reason, store._clock.tick())
+        tx = _tx(conn, "split", agent, reason, store._tick())
         children = []
         for carry in into:
             child = mint()
@@ -69,9 +69,12 @@ def split(store: Store, e: str, into: Sequence[Sequence[str]], *, reason: str,
 def merge(store: Store, es: Sequence[str], *, reason: str,
           choose: dict[str, Any] | None = None,
           agent: str | None = None) -> str:
-    """Mint a survivor carrying the union of source attrs. Conflicting
-    cardinality-one values are all retained in history (later wins in
-    current view) unless `choose` picks one explicitly.
+    """Mint a survivor carrying the union of source attrs. `choose` resolves
+    a cardinality-one conflict explicitly; without it the winner is
+    canonicalized to max(encoded v) — the same rule ingest applies to
+    same-ord remote asserts — so origin and peers converge instead of the
+    origin alone holding multi-values the peers collapse away. Dropped
+    candidates are recorded as 'merge_conflict' refusals.
     PROV: wasDerivedFrom survivor -> each source."""
     conn = store.conn
     for e in es:
@@ -80,7 +83,7 @@ def merge(store: Store, es: Sequence[str], *, reason: str,
     views = [store.view(e) for e in es]
     conn.execute("BEGIN")
     try:
-        tx = _tx(conn, "merge", agent, reason, store._clock.tick())
+        tx = _tx(conn, "merge", agent, reason, store._tick())
         survivor = mint()
         conn.execute("INSERT INTO entity (id, created_tx) VALUES (?, ?)", (survivor, tx))
         merged: dict[str, list[Any]] = {}
@@ -96,11 +99,15 @@ def merge(store: Store, es: Sequence[str], *, reason: str,
                 continue
             if choose and a in choose:
                 values = choose[a] if isinstance(choose[a], list) else [choose[a]]
-            # Conflicting cardinality-one values are ALL left asserted:
-            # (e,a,v,tx) is the datom PK, so assert+retract of the same v in
-            # one tx can't express a merge anyway. Multiple current values
-            # for a 'one' attr are the visible mark of an unresolved merge;
-            # `choose` resolves. History retains every source value.
+            if spec[1] == "one" and len(values) > 1:
+                win = max(values, key=lambda v: _encode(spec[0], v))
+                for v in values:
+                    if v != win:
+                        conn.execute(
+                            "INSERT INTO refusal (wrapper, entity, attr, reason, payload)"
+                            " VALUES ('store', ?, ?, 'merge_conflict', ?)",
+                            (survivor, a, str(v)))
+                values = [win]
             for v in values:
                 store._datom(survivor, a, _enc(store, a, v), tx, added=True)
         for e in es:
@@ -124,7 +131,7 @@ def correct(store: Store, e: str, supersedes: str, *, reason: str,
             raise ValueError(f"correct: unknown entity {x!r}")
     conn.execute("BEGIN")
     try:
-        tx = _tx(conn, "correct", agent, reason, store._clock.tick())
+        tx = _tx(conn, "correct", agent, reason, store._tick())
         _edge(conn, e, supersedes, "severs", tx, reason)
         conn.execute("COMMIT")
         return tx

@@ -1,7 +1,9 @@
 """SQLite connection with the shared schema and core vocabulary applied."""
 from __future__ import annotations
 
+import re
 import sqlite3
+from contextlib import contextmanager
 from importlib import resources
 from pathlib import Path
 
@@ -16,6 +18,18 @@ def _sql(name: str) -> str:
     return resources.files("agents_store").joinpath(name).read_text(encoding="utf-8")
 
 
+def _schema_ddl(marker: str, terminator: str = ";") -> str:
+    """One statement out of schema.sql by its opening text — lets migrations
+    recreate a trigger or view without executescript (which would commit an
+    open transaction)."""
+    m = re.search(
+        re.escape(marker) + r".*?" + re.escape(terminator),
+        _sql("schema.sql"), re.S)
+    if m is None:
+        raise KeyError(f"schema.sql: no statement starting {marker!r}")
+    return m.group(0)
+
+
 def _table_sql(conn: sqlite3.Connection, name: str) -> str | None:
     row = conn.execute(
         "SELECT sql FROM sqlite_master WHERE type='table' AND name=?", (name,)
@@ -23,55 +37,84 @@ def _table_sql(conn: sqlite3.Connection, name: str) -> str | None:
     return row[0] if row else None
 
 
+@contextmanager
+def _migration_tx(conn: sqlite3.Connection):
+    """One migration step: BEGIN IMMEDIATE..COMMIT, rolled back whole on
+    error. FKs go off first (only outside a transaction can the pragma
+    change) so table rebuilds may drop/rename parent tables. Joins an
+    already-open transaction instead of nesting."""
+    own = not conn.in_transaction
+    if own:
+        conn.execute("PRAGMA foreign_keys = OFF")
+        conn.execute("BEGIN IMMEDIATE")
+    try:
+        yield
+    except BaseException:
+        if own:
+            conn.execute("ROLLBACK")
+            conn.execute("PRAGMA foreign_keys = ON")
+        raise
+    else:
+        if own:
+            conn.execute("COMMIT")
+            conn.execute("PRAGMA foreign_keys = ON")
+
+
 def _migrate_v2(conn: sqlite3.Connection) -> None:
     ver = conn.execute("PRAGMA user_version").fetchone()[0]
     if ver >= 2:
         return
 
-    cols = {r[1] for r in conn.execute("PRAGMA table_info(certificate)")}
-    if "code_hash" not in cols:
-        conn.execute("ALTER TABLE certificate ADD COLUMN code_hash TEXT NOT NULL DEFAULT ''")
+    with _migration_tx(conn):
+        cols = {r[1] for r in conn.execute("PRAGMA table_info(certificate)")}
+        if cols and "code_hash" not in cols:
+            conn.execute("ALTER TABLE certificate ADD COLUMN code_hash TEXT NOT NULL DEFAULT ''")
 
-    conn.executescript(_sql("schema.sql"))
+        tx_sql = _table_sql(conn, "tx")
+        if tx_sql and "'retire'" not in tx_sql:
+            # explicit column list: _migrate_v6_pre may already have added
+            # origin cols, which must survive the rebuild
+            tcols = {r[1] for r in conn.execute("PRAGMA table_info(tx)")}
+            origin = {"hlc", "origin_actor", "origin_seq"} <= tcols
+            conn.execute("DROP TABLE IF EXISTS tx_new")
+            conn.execute(f"""
+                CREATE TABLE tx_new (
+                  id      INTEGER PRIMARY KEY AUTOINCREMENT,
+                  ts      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+                  agent   TEXT,
+                  wrapper TEXT,
+                  op      TEXT NOT NULL CHECK (op IN ('assert','evolve','split','merge','correct','retire')),
+                  note    TEXT
+                  {", hlc TEXT, origin_actor TEXT, origin_seq INTEGER" if origin else ""}
+                )""")
+            conn.execute(
+                "INSERT INTO tx_new (id, ts, agent, wrapper, op, note"
+                f"{', hlc, origin_actor, origin_seq' if origin else ''})"
+                " SELECT id, ts, agent, wrapper, op, note"
+                f"{', hlc, origin_actor, origin_seq' if origin else ''} FROM tx")
+            conn.execute("DROP TABLE tx")
+            conn.execute("ALTER TABLE tx_new RENAME TO tx")
 
-    tx_sql = _table_sql(conn, "tx") or ""
-    if "'retire'" not in tx_sql:
-        conn.executescript("""
-            PRAGMA foreign_keys=OFF;
-            CREATE TABLE tx_new (
-              id      INTEGER PRIMARY KEY AUTOINCREMENT,
-              ts      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
-              agent   TEXT,
-              wrapper TEXT,
-              op      TEXT NOT NULL CHECK (op IN ('assert','evolve','split','merge','correct','retire')),
-              note    TEXT
-            );
-            INSERT INTO tx_new SELECT * FROM tx;
-            DROP TABLE tx;
-            ALTER TABLE tx_new RENAME TO tx;
-            PRAGMA foreign_keys=ON;
-        """)
+        lin_sql = _table_sql(conn, "lineage")
+        if lin_sql and "'severs'" not in lin_sql:
+            conn.execute("DROP TABLE IF EXISTS lineage_new")
+            conn.execute("""
+                CREATE TABLE lineage_new (
+                  child  TEXT    NOT NULL REFERENCES entity(id),
+                  parent TEXT    NOT NULL REFERENCES entity(id),
+                  kind   TEXT    NOT NULL CHECK (kind IN (
+                    'wasDerivedFrom','wasRevisionOf','alternateOf','specializationOf','severs')),
+                  tx     INTEGER NOT NULL REFERENCES tx(id),
+                  reason TEXT,
+                  PRIMARY KEY (child, parent, kind, tx)
+                )""")
+            conn.execute(
+                "INSERT INTO lineage_new (child, parent, kind, tx, reason)"
+                " SELECT child, parent, kind, tx, reason FROM lineage")
+            conn.execute("DROP TABLE lineage")
+            conn.execute("ALTER TABLE lineage_new RENAME TO lineage")
 
-    lin_sql = _table_sql(conn, "lineage") or ""
-    if "'severs'" not in lin_sql:
-        conn.executescript("""
-            PRAGMA foreign_keys=OFF;
-            CREATE TABLE lineage_new (
-              child  TEXT    NOT NULL REFERENCES entity(id),
-              parent TEXT    NOT NULL REFERENCES entity(id),
-              kind   TEXT    NOT NULL CHECK (kind IN (
-                'wasDerivedFrom','wasRevisionOf','alternateOf','specializationOf','severs')),
-              tx     INTEGER NOT NULL REFERENCES tx(id),
-              reason TEXT,
-              PRIMARY KEY (child, parent, kind, tx)
-            );
-            INSERT INTO lineage_new SELECT * FROM lineage;
-            DROP TABLE lineage;
-            ALTER TABLE lineage_new RENAME TO lineage;
-            PRAGMA foreign_keys=ON;
-        """)
-
-    conn.execute("PRAGMA user_version = 2")
+        conn.execute("PRAGMA user_version = 2")
 
 
 def _migrate_v3(conn: sqlite3.Connection) -> None:
@@ -80,8 +123,9 @@ def _migrate_v3(conn: sqlite3.Connection) -> None:
     if conn.execute("PRAGMA user_version").fetchone()[0] >= 3:
         return
     from .more.migrate import migrate_queryable_refs
-    migrate_queryable_refs(conn)
-    conn.execute("PRAGMA user_version = 3")
+    with _migration_tx(conn):
+        migrate_queryable_refs(conn)
+        conn.execute("PRAGMA user_version = 3")
 
 
 def _migrate_v4(conn: sqlite3.Connection) -> None:
@@ -90,9 +134,9 @@ def _migrate_v4(conn: sqlite3.Connection) -> None:
     if conn.execute("PRAGMA user_version").fetchone()[0] >= 4:
         return
     from .more.migrate import migrate_said
-    migrate_said(conn)
-    conn.execute("PRAGMA user_version = 4")
-
+    with _migration_tx(conn):
+        migrate_said(conn)
+        conn.execute("PRAGMA user_version = 4")
 
 
 def _migrate_v5(conn: sqlite3.Connection) -> None:
@@ -119,21 +163,22 @@ def _migrate_v5(conn: sqlite3.Connection) -> None:
         ("no-capability-path", "no_capability_path"),
         ("out-of-projection", "out_of_projection"),
     )
-    conn.execute("DROP TRIGGER IF EXISTS refusal_no_update")
-    for old, new in renames:
-        conn.execute("UPDATE refusal SET reason = ? WHERE reason = ?", (new, old))
-    conn.execute(
-        "CREATE TRIGGER IF NOT EXISTS refusal_no_update BEFORE UPDATE ON refusal "
-        "BEGIN SELECT RAISE(ABORT, 'refusal is append-only'); END"
-    )
-    conn.execute("PRAGMA user_version = 5")
+    with _migration_tx(conn):
+        conn.execute("DROP TRIGGER IF EXISTS refusal_no_update")
+        try:
+            for old, new in renames:
+                conn.execute("UPDATE refusal SET reason = ? WHERE reason = ?", (new, old))
+        finally:
+            conn.execute(
+                _schema_ddl("CREATE TRIGGER IF NOT EXISTS refusal_no_update", "END;"))
+        conn.execute("PRAGMA user_version = 5")
 
 
 def _migrate_v6_pre(conn: sqlite3.Connection) -> None:
-    """Column ALTERs that must exist BEFORE schema.sql runs: the canonical
-    schema creates indexes on datom.ord / tx.origin_* — opening a pre-v6
-    database would otherwise crash with 'no such column' inside
-    executescript."""
+    """Column ALTERs that must exist BEFORE anything else runs: transact,
+    ingest and the v3/v4 Store backfills already read datom.ord / tx.hlc,
+    and schema.sql creates indexes on them — on a pre-v6 database the
+    columns have to be added first either way."""
     dcols = {r[1] for r in conn.execute("PRAGMA table_info(datom)")}
     if dcols and "ord" not in dcols:
         conn.execute("ALTER TABLE datom ADD COLUMN ord TEXT NOT NULL DEFAULT ''")
@@ -152,20 +197,19 @@ def _migrate_v6(conn: sqlite3.Connection) -> None:
     """
     if conn.execute("PRAGMA user_version").fetchone()[0] >= 6:
         return
-    _migrate_v6_pre(conn)
-    # backfill rewrites datom rows -> briefly drop the append-only update
-    # trigger, restore it right after (same pattern as _migrate_v5)
-    conn.execute("DROP TRIGGER IF EXISTS datom_no_update")
-    try:
-        conn.execute("UPDATE datom SET ord = printf('%012d', tx) WHERE ord = ''")
-    finally:
-        conn.execute(
-            "CREATE TRIGGER IF NOT EXISTS datom_no_update BEFORE UPDATE ON datom "
-            "BEGIN SELECT RAISE(ABORT, 'datom is append-only'); END"
-        )
-    conn.execute("DROP VIEW IF EXISTS v_current")
-    conn.executescript(_sql("schema.sql"))
-    conn.execute("PRAGMA user_version = 6")
+    with _migration_tx(conn):
+        _migrate_v6_pre(conn)
+        # backfill rewrites datom rows -> briefly drop the append-only update
+        # trigger, restore it right after (same pattern as _migrate_v5)
+        conn.execute("DROP TRIGGER IF EXISTS datom_no_update")
+        try:
+            conn.execute("UPDATE datom SET ord = printf('%012d', tx) WHERE ord = ''")
+        finally:
+            conn.execute(
+                _schema_ddl("CREATE TRIGGER IF NOT EXISTS datom_no_update", "END;"))
+        conn.execute("DROP VIEW IF EXISTS v_current")
+        conn.execute(_schema_ddl("CREATE VIEW IF NOT EXISTS v_current"))
+        conn.execute("PRAGMA user_version = 6")
 
 
 def _migrate_v7(conn: sqlite3.Connection) -> None:
@@ -175,40 +219,43 @@ def _migrate_v7(conn: sqlite3.Connection) -> None:
     """
     if conn.execute("PRAGMA user_version").fetchone()[0] >= 7:
         return
-    acols = {r[1] for r in conn.execute("PRAGMA table_info(attr)")}
-    if "syncable" not in acols:
-        conn.execute("ALTER TABLE attr ADD COLUMN syncable INTEGER NOT NULL DEFAULT 1")
-    tx_sql = _table_sql(conn, "tx") or ""
-    if "'scrub'" not in tx_sql:
-        conn.executescript("""
-            PRAGMA foreign_keys=OFF;
-            DROP TRIGGER IF EXISTS tx_no_update;
-            DROP TRIGGER IF EXISTS tx_no_delete;
-            CREATE TABLE tx_new (
-              id      INTEGER PRIMARY KEY AUTOINCREMENT,
-              ts      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
-              agent   TEXT,
-              wrapper TEXT,
-              op      TEXT NOT NULL CHECK (op IN ('assert','evolve','split','merge','correct','retire','scrub')),
-              note    TEXT,
-              hlc           TEXT,
-              origin_actor  TEXT,
-              origin_seq    INTEGER
-            );
-            INSERT INTO tx_new
-              SELECT id, ts, agent, wrapper, op, note, hlc, origin_actor, origin_seq FROM tx;
-            DROP TABLE tx;
-            ALTER TABLE tx_new RENAME TO tx;
-            CREATE UNIQUE INDEX IF NOT EXISTS ux_tx_origin ON tx(origin_actor, origin_seq)
-              WHERE origin_actor IS NOT NULL;
-            CREATE TRIGGER IF NOT EXISTS tx_no_update BEFORE UPDATE ON tx
-            BEGIN SELECT RAISE(ABORT, 'tx is append-only'); END;
-            CREATE TRIGGER IF NOT EXISTS tx_no_delete BEFORE DELETE ON tx
-            BEGIN SELECT RAISE(ABORT, 'tx is append-only'); END;
-            PRAGMA foreign_keys=ON;
-        """)
-    conn.executescript(_sql("schema.sql"))
-    conn.execute("PRAGMA user_version = 7")
+    with _migration_tx(conn):
+        _migrate_v6_pre(conn)  # guarantee origin cols for the SELECT below
+        acols = {r[1] for r in conn.execute("PRAGMA table_info(attr)")}
+        if acols and "syncable" not in acols:
+            try:
+                conn.execute(
+                    "ALTER TABLE attr ADD COLUMN syncable INTEGER NOT NULL DEFAULT 1"
+                    " CHECK (syncable IN (0,1))")
+            except sqlite3.OperationalError:
+                # sqlite < 3.37 cannot express CHECK in ADD COLUMN
+                conn.execute(
+                    "ALTER TABLE attr ADD COLUMN syncable INTEGER NOT NULL DEFAULT 1")
+        tx_sql = _table_sql(conn, "tx")
+        if tx_sql and "'scrub'" not in tx_sql:
+            conn.execute("DROP TRIGGER IF EXISTS tx_no_update")
+            conn.execute("DROP TRIGGER IF EXISTS tx_no_delete")
+            conn.execute("DROP TABLE IF EXISTS tx_new")
+            conn.execute("""
+                CREATE TABLE tx_new (
+                  id      INTEGER PRIMARY KEY AUTOINCREMENT,
+                  ts      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+                  agent   TEXT,
+                  wrapper TEXT,
+                  op      TEXT NOT NULL CHECK (op IN ('assert','evolve','split','merge','correct','retire','scrub')),
+                  note    TEXT,
+                  hlc           TEXT,
+                  origin_actor  TEXT,
+                  origin_seq    INTEGER
+                )""")
+            conn.execute(
+                "INSERT INTO tx_new (id, ts, agent, wrapper, op, note,"
+                " hlc, origin_actor, origin_seq)"
+                " SELECT id, ts, agent, wrapper, op, note,"
+                " hlc, origin_actor, origin_seq FROM tx")
+            conn.execute("DROP TABLE tx")
+            conn.execute("ALTER TABLE tx_new RENAME TO tx")
+        conn.execute("PRAGMA user_version = 7")
 
 
 def connect(
@@ -227,18 +274,22 @@ def connect(
     conn.execute("PRAGMA foreign_keys = ON")
     if str(path) != ":memory:":
         conn.execute("PRAGMA journal_mode = WAL")
-    _migrate_v6_pre(conn)  # column ALTERs before schema.sql index/view exec
+    if _table_sql(conn, "tx") is not None:
+        # existing history: additive column ALTERs first (the v3/v4
+        # backfills and every write path already read datom.ord / tx.hlc),
+        # then versioned migrations in order — each atomic — and only then
+        # schema.sql's unique indexes + v_current: v6 backfills ord before
+        # ux_datom_eav_ord can see ''-dupes.
+        with _migration_tx(conn):
+            _migrate_v6_pre(conn)
+        for migrate in (_migrate_v2, _migrate_v3, _migrate_v4,
+                        _migrate_v5, _migrate_v6, _migrate_v7):
+            migrate(conn)
     conn.executescript(_sql("schema.sql"))
     conn.executescript(_sql("seed.sql"))
     conn.executescript(
         resources.files("agents_store.more").joinpath("schema.sql").read_text(encoding="utf-8")
     )
-    _migrate_v2(conn)
-    _migrate_v3(conn)
-    _migrate_v4(conn)
-    _migrate_v5(conn)
-    _migrate_v6(conn)
-    _migrate_v7(conn)
     if conn.execute("PRAGMA user_version").fetchone()[0] < SCHEMA_VERSION:
         conn.execute(f"PRAGMA user_version = {SCHEMA_VERSION}")
     return conn

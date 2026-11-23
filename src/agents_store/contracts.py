@@ -9,7 +9,9 @@ from typing import Any, Literal, Mapping, Protocol, Sequence, runtime_checkable
 
 ValueType = Literal["text", "instant", "int", "bool", "ref", "json"]
 Cardinality = Literal["one", "many"]
-TxOp = Literal["assert", "evolve", "split", "merge", "correct", "retire"]
+TxOp = Literal["assert", "evolve", "split", "merge", "correct", "retire", "scrub"]
+# runtime mirror of TxOp for input validation (must match the tx CHECK list)
+VALID_OPS = frozenset({"assert", "evolve", "split", "merge", "correct", "retire", "scrub"})
 CapabilityMode = Literal["render", "lens"]
 ViolationSeverity = Literal["refusal", "warning"]
 

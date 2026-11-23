@@ -39,6 +39,7 @@ CREATE TABLE IF NOT EXISTS datom (
 );
 CREATE INDEX IF NOT EXISTS idx_datom_av ON datom(a, v);
 CREATE INDEX IF NOT EXISTS idx_datom_tx ON datom(tx);
+CREATE INDEX IF NOT EXISTS idx_datom_eao ON datom(e, a, ord);
 CREATE UNIQUE INDEX IF NOT EXISTS ux_datom_eav_ord ON datom(e, a, v, ord);
 
 CREATE TRIGGER IF NOT EXISTS datom_no_update BEFORE UPDATE ON datom

@@ -18,14 +18,15 @@ transact() is the only write API. Its semantics:
 from __future__ import annotations
 
 import json
+import re
 import sqlite3
 from dataclasses import dataclass
 from typing import Any, Callable, Iterable, Sequence
 
 from . import ids
-from .contracts import Change, Datom, WriteRefusal, TxOp
+from .contracts import Change, Datom, WriteRefusal, TxOp, VALID_OPS
 from .grant import is_writable
-from .hlc import Hlc
+from .hlc import Hlc, HLC_GLOB
 
 
 @dataclass(frozen=True)
@@ -62,22 +63,60 @@ def _decode(value_type: str, s: str) -> Any:
     return s
 
 
+_INSTANT_RE = re.compile(r"^\d{4}-\d{2}-\d{2}")
+
+
+def _valid_text(value_type: str, v: str) -> bool:
+    """Stored text must parse under the attr's value_type — guards both
+    local encodes and remote wire values from corrupting the log."""
+    if value_type == "int":
+        try:
+            int(v)
+            return True
+        except (TypeError, ValueError):
+            return False
+    if value_type == "bool":
+        return v in ("true", "false")
+    if value_type == "json":
+        try:
+            json.loads(v)
+            return True
+        except (TypeError, ValueError):
+            return False
+    if value_type == "instant":
+        return isinstance(v, str) and bool(_INSTANT_RE.match(v))
+    return True
+
+
 class Store:
     def __init__(self, conn: sqlite3.Connection, node_id: str = "local"):
         self.conn = conn
+        self.node_id = node_id
         self._specs: dict[str, tuple[str, str]] | None = None
         self._deriving = False  # re-entrancy guard for derive.on_transact
         self._clock = Hlc(node_id)
+        self._hlc_col = "hlc" in {
+            r[1] for r in conn.execute("PRAGMA table_info(tx)")}
         self._seed_clock()
 
     def _seed_clock(self) -> None:
-        """Resume the hlc from the newest minted key so a restart does not
-        mint keys older than already-recorded history."""
+        """Resume/merge the newest minted hlc so a restart (or a second
+        process that minted meanwhile) never lets this node mint keys that
+        order behind recorded history. The GLOB keeps non-hlc strings —
+        e.g. legacy notes sorting above '9' — from shadowing the max."""
+        if not self._hlc_col:
+            return  # mid-migration Store on a pre-v6 tx: no hlc column yet
         row = self.conn.execute(
-            "SELECT hlc FROM tx WHERE hlc IS NOT NULL ORDER BY hlc DESC LIMIT 1"
+            "SELECT MAX(hlc) FROM tx WHERE hlc GLOB ?", (HLC_GLOB,)
         ).fetchone()
         if row and row[0]:
             self._clock.observe(row[0])
+
+    def _tick(self) -> str:
+        """Mint a local ordering key; re-seeds first so a second process
+        cannot have minted past this clock since boot."""
+        self._seed_clock()
+        return self._clock.tick()
 
     # ---- writes -------------------------------------------------------
 
@@ -98,75 +137,126 @@ class Store:
         from . import derive, grant as _grant
         if tx_changes is not None and wrapper != _grant.INTERNAL_WRAPPER:
             raise ValueError("transact: tx_changes is reserved for the internal authority")
-        if entity is not None and self._exists(entity):
-            raise ValueError(f"transact: entity {entity!r} already exists")
-        refusals: list[WriteRefusal] = []
-        mediated: set[int] = set()
-        planned: list[tuple[Change, str]] = []
-        for ch in changes:
-            if ch.e is not None and wrapper != _grant.INTERNAL_WRAPPER:
-                edge = derive.derived_edge(self.conn, ch.e, ch.a)
-                if edge is not None:
-                    mid, a_from, kind, status = edge
-                    if kind == "equal" and status == "witnessed":
-                        planned.append((Change(
-                            e=ch.e, a=a_from, v=ch.v, added=ch.added),
-                            _grant.INTERNAL_WRAPPER))
-                        mediated.add(mid)
-                    else:
-                        refusals.append(self._refuse(
-                            wrapper, ch.e, ch.a, "derived_attr", ch.v))
+        if op not in VALID_OPS:
+            raise ValueError(f"transact: bad op {op!r}")
+        if entity is not None:
+            if self._exists(entity):
+                raise ValueError(f"transact: entity {entity!r} already exists")
+            if self.conn.execute(
+                "SELECT 1 FROM scrubbed WHERE e = ?", (entity,)
+            ).fetchone() is not None:
+                raise ValueError(f"transact: entity {entity!r} was scrubbed")
+        # atomic: the tx row, its datoms and any refusals land together or
+        # not at all. Joins an already-open transaction instead of nesting
+        # (lineage.evolve, migrations) — the outer owner then owns commit.
+        own = not self.conn.in_transaction
+        if own:
+            self.conn.execute("BEGIN IMMEDIATE")
+        try:
+            refusals: list[WriteRefusal] = []
+            mediated: set[int] = set()
+            planned: list[tuple[Change, str]] = []
+            for ch in changes:
+                if ch.e is not None and wrapper != _grant.INTERNAL_WRAPPER:
+                    edge = derive.derived_edge(self.conn, ch.e, ch.a)
+                    if edge is not None:
+                        mid, a_from, kind, status = edge
+                        if kind == "equal" and status == "witnessed":
+                            planned.append((Change(
+                                e=ch.e, a=a_from, v=ch.v, added=ch.added),
+                                _grant.INTERNAL_WRAPPER))
+                            mediated.add(mid)
+                        else:
+                            refusals.append(self._refuse(
+                                wrapper, ch.e, ch.a, "derived_attr", ch.v))
+                        continue
+                planned.append((ch, wrapper))
+            if mediated:
+                note = f"{note or ''} | mediated-write via mediator {sorted(mediated)}"
+            tx_hlc = self._tick()
+            tx_id = self.conn.execute(
+                "INSERT INTO tx (op, agent, wrapper, note, hlc) VALUES (?, ?, ?, ?, ?)",
+                (op, agent, wrapper, note, tx_hlc),
+            ).lastrowid
+            if tx_changes is not None:
+                # internal authority: no derived_attr mediation applies
+                planned.extend((ch, wrapper) for ch in tx_changes(tx_id, entity))
+            minted: str | None = None
+            if any(ch.e is None for ch, _ in planned):
+                minted = entity if entity is not None else ids.mint()
+                self.conn.execute(
+                    "INSERT INTO entity (id, created_tx) VALUES (?, ?)",
+                    (minted, tx_id),
+                )
+            # resolve e and encode v BEFORE collapsing, so dedupe keys are
+            # the stored text (raw values miss: int 1 vs '1', json spacing,
+            # e=None dupes); unencodable values are loud refusals, never
+            # partial corrupt rows.
+            resolved: list[tuple] = []  # (e, ch, v_text, wrapper, card)
+            for ch, ch_wrapper in planned:
+                e = ch.e if ch.e is not None else minted
+                spec = self._spec(ch.a)
+                if spec is None:
+                    resolved.append((e, ch, _encode_key(ch.v), ch_wrapper, None))
                     continue
-            planned.append((ch, wrapper))
-        if mediated:
-            note = f"{note or ''} | mediated-write via mediator {sorted(mediated)}"
-        # same (e,a,v) can appear twice in one tx (retract + re-assert):
-        # ux_datom_eav_ord is unique, so only the last change may write —
-        # collapse deterministically, last change wins.
-        last_idx: dict[tuple, int] = {}
-        for i, (ch, _) in enumerate(planned):
-            if ch.e is not None:
-                last_idx[(ch.e, ch.a, _encode_key(ch.v))] = i
-        planned = [c for i, c in enumerate(planned)
-                   if c[0].e is None or i == last_idx[(c[0].e, c[0].a, _encode_key(c[0].v))]]
-        tx_hlc = self._clock.tick()
-        tx_id = self.conn.execute(
-            "INSERT INTO tx (op, agent, wrapper, note, hlc) VALUES (?, ?, ?, ?, ?)",
-            (op, agent, wrapper, note, tx_hlc),
-        ).lastrowid
-        if tx_changes is not None:
-            # internal authority: no derived_attr mediation applies
-            planned.extend((ch, wrapper) for ch in tx_changes(tx_id, entity))
-        minted: str | None = None
-        applied: list[Datom] = []
-        for ch, ch_wrapper in planned:
-            e = ch.e
-            if e is None:
-                if minted is None:
-                    minted = entity if entity is not None else ids.mint()
-                    self.conn.execute(
-                        "INSERT INTO entity (id, created_tx) VALUES (?, ?)",
-                        (minted, tx_id),
-                    )
-                e = minted
-            elif not self._exists(e):
-                refusals.append(self._refuse(wrapper, e, ch.a, "unknown_entity", ch.v))
-                continue
-            outcome = self._apply(e, ch, tx_id, ch_wrapper, tx_hlc)
-            if isinstance(outcome, WriteRefusal):
-                refusals.append(outcome)
-            else:
-                applied.extend(outcome)
-        # mediated re-derivation: source-attr changes refresh their
-        # derived attrs in a follow-up tx (append-only: no tx nesting)
-        if applied and not self._deriving:
-            from . import derive
-            self._deriving = True
-            try:
-                derive.on_transact(self, {(d.e, d.a) for d in applied})
-            finally:
-                self._deriving = False
-        return TxResult(tx=tx_id, entity=minted, applied=tuple(applied), refusals=tuple(refusals))
+                try:
+                    v_text = _encode(spec[0], ch.v)
+                except (TypeError, ValueError):
+                    v_text = None
+                if v_text is None or not _valid_text(spec[0], v_text):
+                    refusals.append(self._refuse(
+                        ch_wrapper, e, ch.a, "bad_value", ch.v))
+                    continue
+                resolved.append((e, ch, v_text, ch_wrapper, spec[1]))
+            # collapse: cardinality 'one' keeps the LAST change per (e,a)
+            # in this tx; 'many' dedupes (e,a,v) with retract winning.
+            last_one: dict[tuple, int] = {}
+            for i, (e, ch, _v, _w, card) in enumerate(resolved):
+                if card == "one":
+                    last_one[(e, ch.a)] = i
+            kept: list[tuple] = []
+            seen_many: dict[tuple, int] = {}
+            for i, item in enumerate(resolved):
+                e, ch, v_text, ch_wrapper, card = item
+                if card == "one":
+                    if i == last_one[(e, ch.a)]:
+                        kept.append(item)
+                    continue
+                key = (e, ch.a, v_text)
+                if key in seen_many:
+                    if not ch.added:
+                        kept[seen_many[key]] = item  # retract wins
+                else:
+                    seen_many[key] = len(kept)
+                    kept.append(item)
+            applied: list[Datom] = []
+            for e, ch, _vt, ch_wrapper, _card in kept:
+                if not self._exists(e):
+                    refusals.append(self._refuse(
+                        wrapper, e, ch.a, "unknown_entity", ch.v))
+                    continue
+                outcome = self._apply(e, ch, tx_id, ch_wrapper, tx_hlc)
+                if isinstance(outcome, WriteRefusal):
+                    refusals.append(outcome)
+                else:
+                    applied.extend(outcome)
+            # mediated re-derivation: source-attr changes refresh their
+            # derived attrs inside this transaction (atomic with the writes)
+            if applied and not self._deriving:
+                from . import derive
+                self._deriving = True
+                try:
+                    derive.on_transact(self, {(d.e, d.a) for d in applied})
+                finally:
+                    self._deriving = False
+            if own:
+                self.conn.execute("COMMIT")
+            return TxResult(tx=tx_id, entity=minted, applied=tuple(applied),
+                            refusals=tuple(refusals))
+        except BaseException:
+            if own:
+                self.conn.execute("ROLLBACK")
+            raise
 
     def _apply(self, e: str, ch: Change, tx_id: int, wrapper: str, ord_key: str) -> list[Datom] | WriteRefusal:
         spec = self._spec(ch.a)
@@ -254,6 +344,16 @@ class Store:
     def exists(self, e: str) -> bool:
         return self._exists(e)
 
+    def ingest(self, actor: str, seq: int, hlc: str, datoms, *,
+               op: str = "assert", note: str | None = None):
+        """Ingest one remote op under this node's clock — the remote hlc is
+        observed inside ingest so future local ticks order after it, and
+        ops minted here dedupe as self-echo."""
+        from .ingest import ingest as _ingest
+        return _ingest(
+            self.conn, actor, seq, hlc, datoms, op=op, note=note,
+            clock=self._clock, local_node_id=self.node_id)
+
     def find(self, a: str, v: Any = None, *, prefix: str | None = None) -> list[str]:
         """Entities whose current value of `a` equals `v` (or, with `prefix=`,
         starts with that text), in creation order. Uses the (a, v) index."""
@@ -279,11 +379,18 @@ class Store:
 
     def _spec(self, a: str) -> tuple[str, str] | None:
         if self._specs is None:
-            self._specs = {
-                r[0]: (r[1], r[2])
-                for r in self.conn.execute("SELECT name, value_type, cardinality FROM attr")
-            }
-        return self._specs.get(a)
+            self._refresh_specs()
+        spec = self._specs.get(a)
+        if spec is None:
+            self._refresh_specs()  # an attr may have been added after boot
+            spec = self._specs.get(a)
+        return spec
+
+    def _refresh_specs(self) -> None:
+        self._specs = {
+            r[0]: (r[1], r[2])
+            for r in self.conn.execute("SELECT name, value_type, cardinality FROM attr")
+        }
 
     def _decode_by_attr(self, a: str, v: str) -> Any:
         spec = self._spec(a)
@@ -299,15 +406,21 @@ class Store:
             return self.conn.execute(
                 "SELECT a, v FROM v_current WHERE e = ? AND a = ?", (e, a)
             ).fetchall()
-        # as-of: recompute from the log
-        sql = """SELECT d.a, d.v FROM datom d
-                 WHERE d.e = ? AND d.tx <= ? AND d.added = 1
-                   AND NOT EXISTS (SELECT 1 FROM datom r
-                       WHERE r.e = d.e AND r.a = d.a AND r.v = d.v
-                         AND r.added = 0 AND r.tx > d.tx AND r.tx <= ?)"""
-        params: list[Any] = [e, bound, bound]
+        # as-of: same ord-argmax rule as v_current, restricted to d.tx <= bound.
+        # (tx order is local arrival order; ord is the global order — a remote
+        # retract that arrived early still outranks a later-arriving assert.)
+        sql = """SELECT d.a, d.v FROM datom d JOIN attr t ON t.name = d.a
+                 WHERE d.e = ? AND d.tx <= ? AND d.added = 1 AND (
+                   (t.cardinality = 'many' AND d.ord = (
+                     SELECT MAX(x.ord) FROM datom x
+                     WHERE x.e = d.e AND x.a = d.a AND x.v = d.v AND x.tx <= ?))
+                   OR
+                   (t.cardinality = 'one' AND d.ord = (
+                     SELECT MAX(y.ord) FROM datom y
+                     WHERE y.e = d.e AND y.a = d.a AND y.tx <= ?)))"""
+        params: list[Any] = [e, bound, bound, bound]
         if a is not None:
             sql += " AND d.a = ?"
             params.append(a)
-        sql += " GROUP BY d.a, d.v ORDER BY d.a, d.v"
+        sql += " ORDER BY d.a, d.v"
         return self.conn.execute(sql, params).fetchall()
