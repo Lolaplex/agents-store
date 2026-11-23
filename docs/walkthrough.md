@@ -72,8 +72,10 @@ After `add`, re-run `examples\demo.py`-style checks: the entity exists in
    in the store, `when` updated, markdown + pane reflect it.
 6. Complete the task → expected `status: done` everywhere.
 7. Try to add a recurrence rule → expected refusal (HTTP error; a
-   `refusal` row with reason appears — only TZID/floating-time and
-   component-shape violations refuse today; unknown props are preserved
+   `refusal` row with reason appears — only unresolvable times (unknown
+   TZID, a wall time the zone skips) and component-shape violations
+   refuse today; TZID, floating and all-day times are accepted and kept
+   in the client's form; unknown props are preserved
    losslessly in `ical:extra` and re-emitted).
 
 ## What "lawful" means here, concretely

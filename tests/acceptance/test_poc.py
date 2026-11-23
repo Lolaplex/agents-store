@@ -363,12 +363,13 @@ class TestA8MalformedRefused(PocCase):
         self.assertEqual(
             self.conn.execute("SELECT COUNT(*) FROM entity").fetchone()[0],
             n0)
-        # parses fine but breaks our law -> wrapper refusal lands in table
+        # parses fine but breaks our law (a wall time Berlin skips on the
+        # spring-forward transition) -> wrapper refusal lands in table
         status, _, _ = self._request(
             "PUT", "/test/calendar/tz.ics",
             "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nBEGIN:VEVENT\r\n"
             "UID:t1\r\nSUMMARY:x\r\n"
-            "DTSTART;TZID=Europe/Berlin:20261201T100000\r\n"
+            "DTSTART;TZID=Europe/Berlin:20260329T023000\r\n"
             "END:VEVENT\r\nEND:VCALENDAR\r\n",
             {"If-None-Match": "*"})
         self.assertEqual(status, 400)
@@ -416,7 +417,7 @@ class TestA10LossyWriteRefused(PocCase):
             "PUT", "/test/calendar/tz.ics",
             "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nBEGIN:VEVENT\r\n"
             "UID:t1\r\nSUMMARY:x\r\n"
-            "DTSTART;TZID=Europe/Berlin:20261201T100000\r\n"
+            "DTSTART;TZID=Europe/Berlin:20260329T023000\r\n"
             "END:VEVENT\r\nEND:VCALENDAR\r\n",
             {"If-None-Match": "*"})
         self.assertEqual(status, 400)
