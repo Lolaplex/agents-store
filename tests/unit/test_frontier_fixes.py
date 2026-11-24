@@ -288,7 +288,12 @@ class TestScrubEcho(unittest.TestCase):
         self.assertEqual(n, 1)
         envs = [op for op in ops_since(self.ca, 0) if op["op"] == "scrub"]
         self.assertEqual(len(envs), 1)
-        self.assertEqual(envs[0]["note"], "attr:title=leak")
+        # the event names the attr and a sha256[:12] of the value — the
+        # plaintext value must never persist in append-only tx.note
+        import hashlib
+        want = f"attr-hash:title:{hashlib.sha256('leak'.encode()).hexdigest()[:12]}"
+        self.assertEqual(envs[0]["note"], want)
+        self.assertNotIn("leak", envs[0]["note"])
         # peer holds the same leak datom; the event deletes it there too
         ingest(self.cb, "nodeA", 40, "0000000000050.00000.nodeA",
                [(e, "title", "leak", True), (e, "body", "keep", True)])

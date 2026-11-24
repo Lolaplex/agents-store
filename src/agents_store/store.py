@@ -21,12 +21,13 @@ import json
 import re
 import sqlite3
 from dataclasses import dataclass
+from datetime import datetime
 from typing import Any, Callable, Iterable, Sequence
 
 from . import ids
 from .contracts import Change, Datom, WriteRefusal, TxOp, VALID_OPS
 from .grant import is_writable
-from .hlc import Hlc, HLC_GLOB
+from .hlc import Hlc, HLC_GLOB, normalize_node_id
 
 
 @dataclass(frozen=True)
@@ -42,8 +43,16 @@ def _encode(value_type: str, v: Any) -> str:
     if value_type == "json":
         return json.dumps(v, sort_keys=True, separators=(",", ":"))
     if value_type == "bool":
-        return "true" if v in (True, "true") else "false"
+        # bools only: 'garbage' must not silently encode to 'false', and
+        # int 1 is not True (`1 == True` would fool an `in` check)
+        if v is True or (isinstance(v, str) and v == "true"):
+            return "true"
+        if v is False or (isinstance(v, str) and v == "false"):
+            return "false"
+        raise ValueError(f"bool attr got {v!r}")
     if value_type == "int":
+        if isinstance(v, bool):
+            raise ValueError(f"int attr got bool {v!r}")
         return str(int(v))
     return str(v)
 
@@ -63,7 +72,7 @@ def _decode(value_type: str, s: str) -> Any:
     return s
 
 
-_INSTANT_RE = re.compile(r"^\d{4}-\d{2}-\d{2}")
+_INSTANT_RE = re.compile(r"^\d{4}-\d{2}-\d{2}($|[T ].*)")
 
 
 def _valid_text(value_type: str, v: str) -> bool:
@@ -84,7 +93,17 @@ def _valid_text(value_type: str, v: str) -> bool:
         except (TypeError, ValueError):
             return False
     if value_type == "instant":
-        return isinstance(v, str) and bool(_INSTANT_RE.match(v))
+        # real calendar date + ISO shape: '2026-99-99' is a regex match
+        # but not a date, and nothing may follow the date but a T/space
+        # separator — '2026-01-01junk' is not an instant either.
+        if not isinstance(v, str) or not _INSTANT_RE.match(v):
+            return False
+        try:
+            datetime.fromisoformat(
+                v[:-1] + "+00:00" if v.endswith("Z") else v)
+        except ValueError:
+            return False
+        return True
     return True
 
 
@@ -92,6 +111,10 @@ class Store:
     def __init__(self, conn: sqlite3.Connection, node_id: str = "local"):
         self.conn = conn
         self.node_id = node_id
+        # wire identity: the hlc node part ops from this node carry —
+        # self-echo dedupe must compare against the normalized form, not
+        # the raw constructor arg (did:... etc. hash into the alphabet)
+        self.local_node_id = normalize_node_id(node_id)
         self._specs: dict[str, tuple[str, str]] | None = None
         self._deriving = False  # re-entrancy guard for derive.on_transact
         self._clock = Hlc(node_id)
@@ -139,20 +162,24 @@ class Store:
             raise ValueError("transact: tx_changes is reserved for the internal authority")
         if op not in VALID_OPS:
             raise ValueError(f"transact: bad op {op!r}")
-        if entity is not None:
-            if self._exists(entity):
-                raise ValueError(f"transact: entity {entity!r} already exists")
-            if self.conn.execute(
-                "SELECT 1 FROM scrubbed WHERE e = ?", (entity,)
-            ).fetchone() is not None:
-                raise ValueError(f"transact: entity {entity!r} was scrubbed")
         # atomic: the tx row, its datoms and any refusals land together or
         # not at all. Joins an already-open transaction instead of nesting
         # (lineage.evolve, migrations) — the outer owner then owns commit.
+        # The entity checks read inside the write lock: read-then-mint
+        # outside BEGIN IMMEDIATE races into a duplicate-key crash.
         own = not self.conn.in_transaction
         if own:
             self.conn.execute("BEGIN IMMEDIATE")
         try:
+            if entity is not None:
+                if self._exists(entity):
+                    raise ValueError(
+                        f"transact: entity {entity!r} already exists")
+                if self.conn.execute(
+                    "SELECT 1 FROM scrubbed WHERE e = ?", (entity,)
+                ).fetchone() is not None:
+                    raise ValueError(
+                        f"transact: entity {entity!r} was scrubbed")
             refusals: list[WriteRefusal] = []
             mediated: set[int] = set()
             planned: list[tuple[Change, str]] = []
@@ -197,7 +224,15 @@ class Store:
                 e = ch.e if ch.e is not None else minted
                 spec = self._spec(ch.a)
                 if spec is None:
-                    resolved.append((e, ch, _encode_key(ch.v), ch_wrapper, None))
+                    try:
+                        v_key = _encode_key(ch.v)
+                    except (TypeError, ValueError):
+                        # non-JSON value on an unknown attr: the apply
+                        # stage never sees it, so refuse loudly here
+                        refusals.append(self._refuse(
+                            ch_wrapper, e, ch.a, "unknown_attr", ch.v))
+                        continue
+                    resolved.append((e, ch, v_key, ch_wrapper, None))
                     continue
                 try:
                     v_text = _encode(spec[0], ch.v)
@@ -352,7 +387,7 @@ class Store:
         from .ingest import ingest as _ingest
         return _ingest(
             self.conn, actor, seq, hlc, datoms, op=op, note=note,
-            clock=self._clock, local_node_id=self.node_id)
+            clock=self._clock, local_node_id=self.local_node_id)
 
     def find(self, a: str, v: Any = None, *, prefix: str | None = None) -> list[str]:
         """Entities whose current value of `a` equals `v` (or, with `prefix=`,

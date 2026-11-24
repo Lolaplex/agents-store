@@ -17,12 +17,13 @@ an explicit API/CLI, not through transact().
 """
 from __future__ import annotations
 
+import hashlib
 import json
 import sqlite3
 from dataclasses import dataclass
 
 from .db import _schema_ddl
-from .hlc import Hlc, HLC_GLOB
+from .hlc import Hlc, HLC_GLOB, is_hlc, normalize_node_id
 
 SCRUB_WRAPPER = "scrub"
 _DELETE_TRIGGERS = (
@@ -46,10 +47,10 @@ def _audit(conn: sqlite3.Connection, entity: str, reason: str) -> None:
     )
 
 
-def _mint_ord(conn: sqlite3.Connection) -> str:
+def _mint_ord(conn: sqlite3.Connection, node_id: str = "local") -> str:
     """Tombstone ordering key when the caller did not pin one: minted off
     the newest hlc in the log so it sorts above all recorded history."""
-    clock = Hlc("local")
+    clock = Hlc(normalize_node_id(node_id))
     row = conn.execute(
         "SELECT MAX(hlc) FROM tx WHERE hlc GLOB ?", (HLC_GLOB,)).fetchone()
     if row and row[0]:
@@ -99,6 +100,32 @@ def _attr_purge(conn: sqlite3.Connection, spec: str) -> int:
                 _schema_ddl(f"CREATE TRIGGER IF NOT EXISTS {trig}", "END;"))
 
 
+def _v_hash(v: str) -> str:
+    """Value fingerprint for attr-hash scrub notes: sha256[:12]."""
+    return hashlib.sha256(v.encode("utf-8")).hexdigest()[:12]
+
+
+def _attr_hash_purge(conn: sqlite3.Connection, a: str, v_hash: str) -> int:
+    """Value-scoped replay of an 'attr-hash:a:hh' event: delete only
+    datoms whose stored value hashes to the pinned fingerprint — the
+    plaintext value never crosses the wire."""
+    conn.execute("DROP TRIGGER IF EXISTS datom_no_delete")
+    conn.execute("DROP TRIGGER IF EXISTS datom_no_update")
+    try:
+        n = 0
+        for (v,) in conn.execute(
+                "SELECT DISTINCT v FROM datom WHERE a = ?", (a,)).fetchall():
+            if _v_hash(v) == v_hash:
+                n += conn.execute(
+                    "DELETE FROM datom WHERE a = ? AND v = ?",
+                    (a, v)).rowcount
+        return n
+    finally:
+        for trig in ("datom_no_delete", "datom_no_update"):
+            conn.execute(
+                _schema_ddl(f"CREATE TRIGGER IF NOT EXISTS {trig}", "END;"))
+
+
 def _purge(conn: sqlite3.Connection, e: str) -> tuple[int, int]:
     """Delete e's datoms, lineage rows, provenance references and entity
     row, and redact refusal payloads for e; the append-only triggers are
@@ -126,15 +153,18 @@ def scrub_entity(
     *,
     reason: str = "scrub",
     ord_key: str = "",
+    node_id: str = "local",
 ) -> ScrubResult:
     """Physically remove an entity's datoms, lineage rows, and entity row;
     leaves a PII-free tombstone so sync propagates the deletion."""
+    if ord_key and not is_hlc(ord_key):
+        raise ValueError(f"scrub_entity: bad ord_key {ord_key!r}")
     own = not conn.in_transaction
     if own:
         conn.execute("BEGIN IMMEDIATE")
     try:
         if not ord_key:
-            ord_key = _mint_ord(conn)
+            ord_key = _mint_ord(conn, node_id)
         already = conn.execute(
             "SELECT hlc FROM scrubbed WHERE e = ?", (e,)).fetchone()
         _audit(conn, e, reason)
@@ -185,6 +215,7 @@ def scrub_datoms(
     a: str,
     v: str | None = None,
     reason: str = "scrub",
+    node_id: str = "local",
 ) -> int:
     """Remove all datoms carrying attr `a` (optionally restricted to value
     `v`) across entities — e.g. one leaked secret field everywhere."""
@@ -197,11 +228,17 @@ def scrub_datoms(
         n = _attr_purge(conn, spec)
         if n:
             # propagate the attr-level delete as a scrub event: peers
-            # replay the same delete and the origined tx dedupes the echo
+            # replay the same delete and the origined tx dedupes the echo.
+            # tx is append-only and the envelope broadcasts to every peer,
+            # so the note never carries the plaintext value — a v-scoped
+            # scrub ships the attr plus a sha256[:12] fingerprint of v.
+            note = (f"attr:{a}" if v is None
+                    else f"attr-hash:{a}:{_v_hash(v)}")
             conn.execute(
                 "INSERT INTO tx (op, agent, wrapper, note, hlc)"
                 " VALUES ('scrub', ?, ?, ?, ?)",
-                (SCRUB_WRAPPER, SCRUB_WRAPPER, f"attr:{spec}", _mint_ord(conn)))
+                (SCRUB_WRAPPER, SCRUB_WRAPPER, note,
+                 _mint_ord(conn, node_id)))
         if own:
             conn.execute("COMMIT")
     except BaseException:
