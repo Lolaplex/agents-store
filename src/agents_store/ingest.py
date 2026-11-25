@@ -4,10 +4,13 @@ The distributor (agents-sync) owns delivery; this module owns semantics.
 A remote op is one remote tx: its datoms land verbatim under a new local
 tx stamped with the remote's hlc (ord) and (origin_actor, origin_seq).
 
-Rules (frontier review 22.11):
+Rules (frontier review 22.11, hardened W03):
 
 - Idempotent: (origin_actor, origin_seq) is unique — redelivery of the
-  same remote tx returns the existing local tx, no new datoms.
+  same remote tx returns the existing local tx, no new datoms. The
+  dedupe runs BEFORE any write, for scrub ops too.
+- Atomic: op, tx row and every datom/refusal commit together — a crash
+  mid-ingest leaves nothing, so replay applies cleanly.
 - Self-echo: ops that originated HERE (actor == local_node_id) and whose
   local tx still exists dedupe to zero new rows, no phantom tx.
 - Per-datom dedupe: ux_datom_eav_ord ignores facts already present
@@ -17,7 +20,12 @@ Rules (frontier review 22.11):
   * >1 distinct asserted value for a card-one (e,a) at the same ord ->
     max(v) wins + refusal 'card_one_same_ord'.
 - Scrub tombstones: datoms for a scrubbed entity with ord <= the scrub
-  hlc are dropped; op='scrub' replays a local scrub_entity.
+  hlc are dropped; op='scrub' replays the delete + tombstone under an
+  ORIGINED tx — a replayed scrub produces nothing for ops_since to ship
+  back, so hubs and spokes cannot echo it to each other forever.
+- Validation: op must be a real tx op, non-empty hlc must be strict
+  hlc shape, and each wire value must parse under its attr's value_type —
+  garbage is a loud refusal row, never corrupt rows.
 - Grants are NOT re-checked: the origin already gate-kept the write;
   re-checking would diverge across nodes with different cert state.
   Unknown and never-syncable attrs are skipped loudly as refusal rows.
@@ -25,8 +33,13 @@ Rules (frontier review 22.11):
 from __future__ import annotations
 
 import sqlite3
+import time
 from dataclasses import dataclass
 from typing import Iterable
+
+from .contracts import VALID_OPS
+from .hlc import MAX_DRIFT_MS, _parse, is_hlc
+from .store import _valid_text
 
 # (e, a, v, added) — v already store-encoded text
 RemoteDatom = tuple[str, str, str, bool]
@@ -35,6 +48,7 @@ INGEST_WRAPPER = "sync"
 
 # attr names starting with these prefixes never cross the wire, in either
 # direction — enforced here so agents-sync can stay store-agnostic.
+# Matched case-insensitively.
 NEVER_SYNC_PREFIXES = ("local:", "secret:", "vault:", "host:")
 
 
@@ -54,10 +68,24 @@ class IngestResult:
 def _syncable(conn: sqlite3.Connection, a: str, known: set[str]) -> bool:
     if a not in known:
         return False
-    if a.startswith(NEVER_SYNC_PREFIXES):
+    if a.lower().startswith(NEVER_SYNC_PREFIXES):
         return False
     row = conn.execute("SELECT syncable FROM attr WHERE name = ?", (a,)).fetchone()
     return bool(row and row[0])
+
+
+def _scrub_attr_target(note: str) -> tuple[str, tuple[str, str]] | None:
+    """-> (attr, (kind, arg)) for attr-level scrub notes, else None:
+    'attr:a[=v]' carries a plain purge spec; 'attr-hash:a:hh' carries a
+    sha256[:12] fingerprint of the scrubbed value so replay stays
+    value-scoped without the plaintext ever crossing the wire."""
+    if note.startswith("attr-hash:"):
+        attr, _, h = note[len("attr-hash:"):].rpartition(":")
+        return attr, ("hash", h)
+    if note.startswith("attr:"):
+        spec = note[len("attr:"):]
+        return spec.partition("=")[0], ("spec", spec)
+    return None
 
 
 def _refuse(conn, e: str, a: str | None, reason: str, payload) -> None:
@@ -94,40 +122,141 @@ def ingest(
     clock=None,
     local_node_id: str | None = None,
 ) -> IngestResult:
-    if op == "scrub":
-        # Remote hard-delete tombstone: note carries the entity id, hlc
-        # is the cutoff. Replay locally; idempotent via scrubbed PK.
-        from .scrub import scrub_entity
-        e = str(note or "")
-        res = scrub_entity(conn, e, reason="remote scrub", ord_key=hlc)
-        if clock is not None and hlc:
-            clock.observe(hlc)
-        return IngestResult(tx=res.tx, applied=res.datoms_removed, dupes=0, refused=0)
-
-    row = conn.execute(
-        "SELECT id FROM tx WHERE origin_actor = ? AND origin_seq = ?",
-        (actor, seq),
-    ).fetchone()
     items = _collapse(list(datoms))
-    if row is not None:
-        return IngestResult(tx=row[0], applied=0, dupes=len(items), refused=0)
-    # self-echo: this op was minted here; dedupe without a new tx row
-    if local_node_id and actor == local_node_id:
-        own = conn.execute(
-            "SELECT id FROM tx WHERE id = ? AND origin_actor IS NULL", (seq,)
-        ).fetchone()
-        if own is not None:
-            return IngestResult(tx=own[0], applied=0, dupes=len(items), refused=0)
+    if op not in VALID_OPS:
+        _refuse(conn, None, None, "bad_op", f"{op} from {actor}@{seq}")
+        return IngestResult(tx=0, applied=0, dupes=0, refused=len(items) or 1)
+    if hlc and not is_hlc(hlc):
+        # garbage like 'zzzz' would win LWW forever; reject the whole op
+        _refuse(conn, None, None, "bad_hlc", hlc)
+        return IngestResult(tx=0, applied=0, dupes=0, refused=len(items) or 1)
+    if hlc:
+        # a far-future hlc passes is_hlc but must never reach tx/datom:
+        # its ord would hijack v_current forever and MAX(tx.hlc) would pin
+        # the local clock at the drift clamp on every subsequent tick.
+        rms = _parse(hlc)[0]
+        if rms > int(time.time() * 1000) + MAX_DRIFT_MS:
+            _refuse(conn, None, None, "clock_skew", hlc)
+            return IngestResult(tx=0, applied=0, dupes=0,
+                                refused=len(items) or 1)
 
-    specs = {r[0]: r[1] for r in conn.execute(
-        "SELECT name, cardinality FROM attr")}
+    own_tx = not conn.in_transaction
+    if own_tx:
+        conn.execute("BEGIN IMMEDIATE")
+    try:
+        # dedupe first — for scrub ops too: a replayed tombstone must not
+        # mint a new un-origined local tx (the hub<->spoke echo storm).
+        # The check sits inside BEGIN IMMEDIATE: read-then-insert outside
+        # the write lock races into a ux_tx_origin IntegrityError.
+        res = None
+        row = conn.execute(
+            "SELECT id FROM tx WHERE origin_actor = ? AND origin_seq = ?",
+            (actor, seq),
+        ).fetchone()
+        if row is not None:
+            res = IngestResult(tx=row[0], applied=0, dupes=len(items),
+                               refused=0)
+        elif local_node_id and actor == local_node_id:
+            # self-echo: minted here; dedupe without a new tx row
+            own = conn.execute(
+                "SELECT id FROM tx WHERE id = ? AND origin_actor IS NULL",
+                (seq,),
+            ).fetchone()
+            if own is not None:
+                res = IngestResult(tx=own[0], applied=0, dupes=len(items),
+                                   refused=0)
+        if res is None:
+            if op == "scrub":
+                res = _ingest_scrub(conn, actor, seq, hlc, note)
+            else:
+                res = _ingest_datoms(conn, actor, seq, hlc, items,
+                                     op=op, note=note)
+            if clock is not None and hlc:
+                clock.observe(hlc)
+        if own_tx:
+            conn.execute("COMMIT")
+        return res
+    except BaseException:
+        if own_tx:
+            conn.execute("ROLLBACK")
+        raise
+
+
+def _ingest_scrub(conn: sqlite3.Connection, actor: str, seq: int, hlc: str,
+                  note: str | None) -> IngestResult:
+    """Remote hard-delete tombstone: note carries the entity id, hlc is the
+    cutoff. Delete + scrubbed + the ORIGINED scrub tx commit together;
+    ops_since ships it back with the foreign origin, so it dedupes at the
+    sender instead of re-scrubbing (no echo storm).
+
+    An attr-level target is a delete request, not a license: the named
+    attr must be syncable here — a remote peer can never wipe local:* /
+    secret:* / vault:* / host:* datoms."""
+    target = (note or "").strip()
+    if not target:
+        _refuse(conn, None, None, "bad_scrub", note)
+        return IngestResult(tx=0, applied=0, dupes=0, refused=1)
+    from .scrub import _attr_hash_purge, _attr_purge, _audit, _purge
+    cutoff = hlc or f"{seq:012d}.{actor}"
+    attr_target = _scrub_attr_target(target)
+    if attr_target is not None:
+        # attr-level scrub event: replay the physical delete only — no
+        # entity tombstone (the entity itself survives)
+        attr, (kind, arg) = attr_target
+        if not attr:
+            _refuse(conn, None, None, "bad_scrub", note)
+            return IngestResult(tx=0, applied=0, dupes=0, refused=1)
+        known = {r[0] for r in conn.execute("SELECT name FROM attr")}
+        if not _syncable(conn, attr, known):
+            _refuse(conn, None, attr, "scrub_forbidden_attr", note)
+            return IngestResult(tx=0, applied=0, dupes=0, refused=1)
+        if kind == "hash":
+            d = _attr_hash_purge(conn, attr, arg)
+        else:
+            d = _attr_purge(conn, arg)
+        _audit(conn, target, "remote scrub")
+    else:
+        d, _l = _purge(conn, target)
+        conn.execute(
+            "INSERT INTO scrubbed (e, hlc) VALUES (?, ?)"
+            " ON CONFLICT(e) DO UPDATE SET hlc = MAX(hlc, excluded.hlc)",
+            (target, cutoff))
+        _audit(conn, target, "remote scrub")
+    tx_id = conn.execute(
+        "INSERT INTO tx (op, agent, wrapper, note, hlc, origin_actor, origin_seq)"
+        " VALUES ('scrub', ?, ?, ?, ?, ?, ?)",
+        (actor, INGEST_WRAPPER, target, cutoff, actor, seq),
+    ).lastrowid
+    return IngestResult(tx=tx_id, applied=d, dupes=0, refused=0)
+
+
+def _ingest_datoms(conn: sqlite3.Connection, actor: str, seq: int, hlc: str,
+                   items: list[RemoteDatom], *, op: str,
+                   note: str | None) -> IngestResult:
+    specs = {r[0]: (r[1], r[2]) for r in conn.execute(
+        "SELECT name, value_type, cardinality FROM attr")}
     known = set(specs)
     scrubbed = {r[0]: r[1] for r in conn.execute("SELECT e, hlc FROM scrubbed")}
 
+    # refuse non-syncable + unparseable datoms up front so they cannot
+    # poison the same-ord card-one canonicalize below
+    checked: list[RemoteDatom] = []
+    refused = 0
+    for e, a, v, added in items:
+        if not _syncable(conn, a, known):
+            _refuse(conn, e, a,
+                    "non_syncable_attr" if a in known else "unknown_attr", v)
+            refused += 1
+        elif not _valid_text(specs[a][0], v):
+            _refuse(conn, e, a, "bad_value", v)
+            refused += 1
+        else:
+            checked.append((e, a, v, added))
+
     # card-one canonicalize: distinct asserted values at same (e,a) -> max
     one_multi: dict[tuple, list[str]] = {}
-    for e, a, v, added in items:
-        if added and specs.get(a) == "one":
+    for e, a, v, added in checked:
+        if added and specs[a][1] == "one":
             one_multi.setdefault((e, a), [])
             if v not in one_multi[(e, a)]:
                 one_multi[(e, a)].append(v)
@@ -144,12 +273,8 @@ def ingest(
     # pre-v6 remote ops may carry an empty hlc; fall back to the origin
     # seq so distinct remote txs still get distinct ordering keys
     ord_key = hlc or f"{seq:012d}.{actor}"
-    applied = dupes = refused = 0
-    for e, a, v, added in items:
-        if not _syncable(conn, a, known):
-            _refuse(conn, e, a, "non_syncable_attr" if a in known else "unknown_attr", v)
-            refused += 1
-            continue
+    applied = dupes = 0
+    for e, a, v, added in checked:
         if (e, a, v) in losers:
             _refuse(conn, e, a, "card_one_same_ord", v)
             refused += 1
@@ -171,8 +296,6 @@ def ingest(
             applied += 1
         else:
             dupes += 1
-    if clock is not None and hlc:
-        clock.observe(hlc)
     return IngestResult(tx=tx_id, applied=applied, dupes=dupes, refused=refused)
 
 
@@ -203,14 +326,25 @@ def ops_since(
     projections stamp `proj:<session>`; pass their prefixes in
     local_origins so they count as local for the echo filter.
 
-    Never-syncable datoms are filtered out at the source. since_tx below
-    the compaction floor raises ResyncRequired — caller must snapshot.
+    Never-syncable datoms are filtered out at the source (attr.syncable
+    plus the case-insensitive NEVER_SYNC_PREFIXES); a tx left with zero
+    shippable datoms emits no envelope at all — except op='scrub', whose
+    empty datom list IS the tombstone being propagated. A scrub envelope
+    targeting an attr is likewise dropped when that attr is empty or
+    non-syncable here: a scrubbed local-only attr must not cross the wire
+    either. The SQL cursor pages past filtered txs until `limit` envelopes
+    collect or the log ends, so a long run of local-only txs can never
+    starve a bounded pull. since_tx below the compaction floor raises
+    ResyncRequired — caller must snapshot.
     """
+    if isinstance(local_origins, (str, bytes)):
+        raise TypeError(
+            "ops_since: local_origins must be a non-string sequence of prefixes")
     if since_tx < floor_tx(conn):
         raise ResyncRequired(
             f"cursor {since_tx} behind floor_tx {floor_tx(conn)}")
     where = "id > ?"
-    params: list = [since_tx]
+    params: list = []
     if origin_only:
         # Prefix match via substr() with bound parameters: no SQL string
         # interpolation and no LIKE wildcard semantics (`%`/`_` in a
@@ -223,32 +357,48 @@ def ops_since(
             local += " OR substr(origin_actor, 1, ?) = ?"
             params.extend([len(prefix), prefix])
         where += f" AND ({local})"
-    params.append(limit)
-    rows = conn.execute(
+    sql = (
         "SELECT id, agent, wrapper, op, note, hlc, origin_actor, origin_seq, ts"
-        f" FROM tx WHERE {where} ORDER BY id LIMIT ?",
-        params,
-    ).fetchall()
+        f" FROM tx WHERE {where} ORDER BY id LIMIT ?")
+    known = {r[0] for r in conn.execute("SELECT name FROM attr")}
     out = []
-    for tx_id, agent, wrapper, op, note, hlc, oa, osq, ts in rows:
-        datoms = conn.execute(
-            "SELECT d.e, d.a, d.v, d.added FROM datom d JOIN attr t ON t.name = d.a"
-            f" WHERE d.tx = ? AND t.syncable = 1"
-            + "".join(f" AND d.a NOT LIKE '{p}%'" for p in NEVER_SYNC_PREFIXES)
-            + " ORDER BY d.rowid",
-            (tx_id,),
-        ).fetchall()
-        out.append({
-            "tx": tx_id,
-            "origin_actor": oa,
-            "origin_seq": osq if oa is not None else tx_id,
-            "hlc": hlc or "",
-            "agent": agent,
-            "op": op,
-            "note": note,
-            "ts": ts,
-            "datoms": [{"e": e, "a": a, "v": v, "added": bool(ad)} for e, a, v, ad in datoms],
-        })
+    after = since_tx
+    while len(out) < limit:
+        rows = conn.execute(sql, [after, *params, limit]).fetchall()
+        if not rows:
+            break
+        after = rows[-1][0]
+        for tx_id, agent, wrapper, op, note, hlc, oa, osq, ts in rows:
+            datoms = [
+                (e, a, v, ad) for e, a, v, ad in conn.execute(
+                    "SELECT d.e, d.a, d.v, d.added FROM datom d"
+                    " JOIN attr t ON t.name = d.a"
+                    " WHERE d.tx = ? AND t.syncable = 1 ORDER BY d.rowid",
+                    (tx_id,)).fetchall()
+                if not a.lower().startswith(NEVER_SYNC_PREFIXES)
+            ]
+            if op == "scrub":
+                attr_target = _scrub_attr_target((note or "").strip())
+                if (attr_target is not None
+                        and not _syncable(conn, attr_target[0], known)):
+                    continue  # attr-scrub of a non-syncable/empty attr stays local
+            elif not datoms:
+                continue  # nothing shippable left — no empty envelopes
+            out.append({
+                "tx": tx_id,
+                "origin_actor": oa,
+                "origin_seq": osq if oa is not None else tx_id,
+                "hlc": hlc or "",
+                "agent": agent,
+                "op": op,
+                "note": note,
+                "ts": ts,
+                "datoms": [{"e": e, "a": a, "v": v, "added": bool(ad)} for e, a, v, ad in datoms],
+            })
+            if len(out) >= limit:
+                break
+        if len(rows) < limit:
+            break
     return out
 
 

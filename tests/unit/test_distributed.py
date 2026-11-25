@@ -4,6 +4,7 @@ Simulates the agents-sync distributor verbatim: pull ops_since(cursor) on
 the source, ingest() into the destination with the sender's node id.
 Delivery may drop, duplicate, reorder — convergence is the assertion.
 """
+import time
 import unittest
 
 from agents_store import Change, connect
@@ -213,12 +214,23 @@ class TestFrontierRules(unittest.TestCase):
 
     def test_ingest_observes_remote_hlc(self):
         self.sa.transact([Change(e=None, a="title", v="a")], wrapper="test")
-        far = "9999000000000.00000.nodeZ"
+        # within the drift window the remote key is merged as-is
+        soon = int(time.time() * 1000) + 30_000
+        far = f"{soon:013d}.00000.nodeZ"
         ingest(self.ca, "nodeZ", 1, far,
                [("e1", "title", "z", True)], clock=self.sa._clock)
         self.sa.transact([Change(e=None, a="title", v="b")], wrapper="test")
         new_hlc = ops_since(self.ca, cursor(self.ca) - 1)[-1]["hlc"]
         self.assertGreater(new_hlc, far)
+
+    def test_ingest_clamps_far_future_hlc(self):
+        # a skewed peer must not pin the fleet clock at year 2286
+        far = "9999000000000.00000.nodeZ"
+        ingest(self.ca, "nodeZ", 1, far,
+               [("e1", "title", "z", True)], clock=self.sa._clock)
+        self.sa.transact([Change(e=None, a="title", v="b")], wrapper="test")
+        new_hlc = ops_since(self.ca, cursor(self.ca) - 1)[-1]["hlc"]
+        self.assertLess(int(new_hlc.split(".")[0]), 9999000000000)
 
     def test_card_one_same_ord_canonicalizes_to_max(self):
         r = ingest(self.cb, "nodeA", 1, "0000000000050.00000.nodeA",

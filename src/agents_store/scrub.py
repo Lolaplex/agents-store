@@ -17,13 +17,19 @@ an explicit API/CLI, not through transact().
 """
 from __future__ import annotations
 
+import hashlib
+import json
 import sqlite3
 from dataclasses import dataclass
 
-from .db import _sql
+from .db import _schema_ddl
+from .hlc import Hlc, HLC_GLOB, is_hlc, normalize_node_id
 
 SCRUB_WRAPPER = "scrub"
-_DELETE_TRIGGERS = ("datom_no_delete", "datom_no_update", "lineage_no_delete")
+_DELETE_TRIGGERS = (
+    "datom_no_delete", "datom_no_update", "lineage_no_delete",
+    "provenance_no_delete", "refusal_no_update",
+)
 
 
 @dataclass(frozen=True)
@@ -41,58 +47,161 @@ def _audit(conn: sqlite3.Connection, entity: str, reason: str) -> None:
     )
 
 
+def _mint_ord(conn: sqlite3.Connection, node_id: str = "local") -> str:
+    """Tombstone ordering key when the caller did not pin one: minted off
+    the newest hlc in the log so it sorts above all recorded history."""
+    clock = Hlc(normalize_node_id(node_id))
+    row = conn.execute(
+        "SELECT MAX(hlc) FROM tx WHERE hlc GLOB ?", (HLC_GLOB,)).fetchone()
+    if row and row[0]:
+        clock.observe(row[0])
+    return clock.tick()
+
+
+def _drop_purge_triggers(conn: sqlite3.Connection) -> None:
+    for trig in _DELETE_TRIGGERS:
+        conn.execute(f"DROP TRIGGER IF EXISTS {trig}")
+
+
+def _restore_purge_triggers(conn: sqlite3.Connection) -> None:
+    # single-statement executes: executescript would commit an open tx
+    for trig in _DELETE_TRIGGERS:
+        conn.execute(
+            _schema_ddl(f"CREATE TRIGGER IF NOT EXISTS {trig}", "END;"))
+
+
+def _prov_mentions(out_ref: str, in_refs: str, e: str) -> bool:
+    try:
+        if json.loads(out_ref).get("e") == e:
+            return True
+    except (ValueError, AttributeError):
+        pass
+    try:
+        return any(
+            isinstance(r, dict) and r.get("e") == e for r in json.loads(in_refs))
+    except (ValueError, TypeError):
+        return False
+
+
+def _attr_purge(conn: sqlite3.Connection, spec: str) -> int:
+    """Replay an attr-level scrub event ('a' or 'a=v') — the physical
+    delete scrub_datoms performs, shared by remote replay."""
+    a, eq, v = spec.partition("=")
+    conn.execute("DROP TRIGGER IF EXISTS datom_no_delete")
+    conn.execute("DROP TRIGGER IF EXISTS datom_no_update")
+    try:
+        if eq:
+            return conn.execute(
+                "DELETE FROM datom WHERE a = ? AND v = ?", (a, v)).rowcount
+        return conn.execute("DELETE FROM datom WHERE a = ?", (a,)).rowcount
+    finally:
+        for trig in ("datom_no_delete", "datom_no_update"):
+            conn.execute(
+                _schema_ddl(f"CREATE TRIGGER IF NOT EXISTS {trig}", "END;"))
+
+
+def _v_hash(v: str) -> str:
+    """Value fingerprint for attr-hash scrub notes: sha256[:12]."""
+    return hashlib.sha256(v.encode("utf-8")).hexdigest()[:12]
+
+
+def _attr_hash_purge(conn: sqlite3.Connection, a: str, v_hash: str) -> int:
+    """Value-scoped replay of an 'attr-hash:a:hh' event: delete only
+    datoms whose stored value hashes to the pinned fingerprint — the
+    plaintext value never crosses the wire."""
+    conn.execute("DROP TRIGGER IF EXISTS datom_no_delete")
+    conn.execute("DROP TRIGGER IF EXISTS datom_no_update")
+    try:
+        n = 0
+        for (v,) in conn.execute(
+                "SELECT DISTINCT v FROM datom WHERE a = ?", (a,)).fetchall():
+            if _v_hash(v) == v_hash:
+                n += conn.execute(
+                    "DELETE FROM datom WHERE a = ? AND v = ?",
+                    (a, v)).rowcount
+        return n
+    finally:
+        for trig in ("datom_no_delete", "datom_no_update"):
+            conn.execute(
+                _schema_ddl(f"CREATE TRIGGER IF NOT EXISTS {trig}", "END;"))
+
+
+def _purge(conn: sqlite3.Connection, e: str) -> tuple[int, int]:
+    """Delete e's datoms, lineage rows, provenance references and entity
+    row, and redact refusal payloads for e; the append-only triggers are
+    dropped and restored inside the caller's transaction."""
+    _drop_purge_triggers(conn)
+    try:
+        d = conn.execute("DELETE FROM datom WHERE e = ?", (e,)).rowcount
+        l = conn.execute(
+            "DELETE FROM lineage WHERE child = ? OR parent = ?", (e, e)).rowcount
+        conn.execute("DELETE FROM entity WHERE id = ?", (e,))
+        prov_rows = conn.execute(
+            "SELECT rowid, out_ref, in_refs FROM provenance").fetchall()
+        for rid, out_ref, in_refs in prov_rows:
+            if _prov_mentions(out_ref, in_refs, e):
+                conn.execute("DELETE FROM provenance WHERE rowid = ?", (rid,))
+        conn.execute("UPDATE refusal SET payload = NULL WHERE entity = ?", (e,))
+    finally:
+        _restore_purge_triggers(conn)
+    return d, l
+
+
 def scrub_entity(
     conn: sqlite3.Connection,
     e: str,
     *,
     reason: str = "scrub",
     ord_key: str = "",
+    node_id: str = "local",
 ) -> ScrubResult:
     """Physically remove an entity's datoms, lineage rows, and entity row;
     leaves a PII-free tombstone so sync propagates the deletion."""
-    already = conn.execute(
-        "SELECT hlc FROM scrubbed WHERE e = ?", (e,)).fetchone()
-    if already is not None:
-        # repeat scrub (e.g. remote tombstone replayed after local one):
-        # still delete anything that slipped in since, keep the FIRST hlc
-        # (stricter cutoff wins — an earlier scrub covers more arrivals)
-        cutoff = min(already[0], ord_key) if ord_key else already[0]
-        if cutoff != already[0]:
-            _update_scrubbed(conn, e, cutoff)
-        _audit(conn, e, reason)
-        for trig in _DELETE_TRIGGERS:
-            conn.execute(f"DROP TRIGGER IF EXISTS {trig}")
-        try:
-            d = conn.execute("DELETE FROM datom WHERE e = ?", (e,)).rowcount
-            l = conn.execute(
-                "DELETE FROM lineage WHERE child = ? OR parent = ?", (e, e)).rowcount
-            conn.execute("DELETE FROM entity WHERE id = ?", (e,))
-        finally:
-            conn.executescript(_sql("schema.sql"))
-        tx_row = conn.execute(
-            "SELECT id FROM tx WHERE op = 'scrub' AND note = ? ORDER BY id LIMIT 1",
-            (e,)).fetchone()
-        return ScrubResult(entity=e, tx=tx_row[0] if tx_row else 0,
-                           datoms_removed=d, lineage_removed=l)
-
-    _audit(conn, e, reason)
-    tx_id = conn.execute(
-        "INSERT INTO tx (op, agent, wrapper, note, hlc) VALUES ('scrub', ?, ?, ?, ?)",
-        (SCRUB_WRAPPER, SCRUB_WRAPPER, e, ord_key),
-    ).lastrowid
-    conn.execute("INSERT OR IGNORE INTO scrubbed (e, hlc) VALUES (?, ?)", (e, ord_key))
-    for trig in _DELETE_TRIGGERS:
-        conn.execute(f"DROP TRIGGER IF EXISTS {trig}")
+    if ord_key and not is_hlc(ord_key):
+        raise ValueError(f"scrub_entity: bad ord_key {ord_key!r}")
+    own = not conn.in_transaction
+    if own:
+        conn.execute("BEGIN IMMEDIATE")
     try:
-        datoms = conn.execute("DELETE FROM datom WHERE e = ?", (e,)).rowcount
-        lineage = conn.execute(
-            "DELETE FROM lineage WHERE child = ? OR parent = ?", (e, e)
-        ).rowcount
-        conn.execute("DELETE FROM entity WHERE id = ?", (e,))
-    finally:
-        conn.executescript(_sql("schema.sql"))  # recreate triggers, IF NOT EXISTS
-    return ScrubResult(entity=e, tx=tx_id, datoms_removed=datoms,
-                       lineage_removed=lineage)
+        if not ord_key:
+            ord_key = _mint_ord(conn, node_id)
+        already = conn.execute(
+            "SELECT hlc FROM scrubbed WHERE e = ?", (e,)).fetchone()
+        _audit(conn, e, reason)
+        if already is None:
+            tx_id = conn.execute(
+                "INSERT INTO tx (op, agent, wrapper, note, hlc) VALUES ('scrub', ?, ?, ?, ?)",
+                (SCRUB_WRAPPER, SCRUB_WRAPPER, e, ord_key),
+            ).lastrowid
+            conn.execute(
+                "INSERT INTO scrubbed (e, hlc) VALUES (?, ?)", (e, ord_key))
+        else:
+            # repeat scrub (e.g. remote tombstone replayed after local one):
+            # still delete anything that slipped in since, keep the LATEST
+            # hlc (a later cutoff covers more late arrivals)
+            cutoff = max(already[0], ord_key)
+            if cutoff != already[0]:
+                _update_scrubbed(conn, e, cutoff)
+                # a stricter cutoff is a new tombstone event — it must
+                # reach the peers too, or they keep the weaker one
+                tx_id = conn.execute(
+                    "INSERT INTO tx (op, agent, wrapper, note, hlc)"
+                    " VALUES ('scrub', ?, ?, ?, ?)",
+                    (SCRUB_WRAPPER, SCRUB_WRAPPER, e, cutoff)).lastrowid
+            else:
+                tx_row = conn.execute(
+                    "SELECT id FROM tx WHERE op = 'scrub' AND note = ? ORDER BY id LIMIT 1",
+                    (e,)).fetchone()
+                tx_id = tx_row[0] if tx_row else 0
+        d, l = _purge(conn, e)
+        if own:
+            conn.execute("COMMIT")
+    except BaseException:
+        if own:
+            conn.execute("ROLLBACK")
+        raise
+    return ScrubResult(entity=e, tx=tx_id, datoms_removed=d,
+                       lineage_removed=l)
 
 
 def _update_scrubbed(conn: sqlite3.Connection, e: str, hlc: str) -> None:
@@ -106,17 +215,34 @@ def scrub_datoms(
     a: str,
     v: str | None = None,
     reason: str = "scrub",
+    node_id: str = "local",
 ) -> int:
     """Remove all datoms carrying attr `a` (optionally restricted to value
     `v`) across entities — e.g. one leaked secret field everywhere."""
-    _audit(conn, f"attr:{a}", reason)
-    conn.execute("DROP TRIGGER IF EXISTS datom_no_delete")
-    conn.execute("DROP TRIGGER IF EXISTS datom_no_update")
+    own = not conn.in_transaction
+    if own:
+        conn.execute("BEGIN IMMEDIATE")
     try:
-        if v is None:
-            n = conn.execute("DELETE FROM datom WHERE a = ?", (a,)).rowcount
-        else:
-            n = conn.execute("DELETE FROM datom WHERE a = ? AND v = ?", (a, v)).rowcount
-    finally:
-        conn.executescript(_sql("schema.sql"))
+        _audit(conn, f"attr:{a}", reason)
+        spec = a if v is None else f"{a}={v}"
+        n = _attr_purge(conn, spec)
+        if n:
+            # propagate the attr-level delete as a scrub event: peers
+            # replay the same delete and the origined tx dedupes the echo.
+            # tx is append-only and the envelope broadcasts to every peer,
+            # so the note never carries the plaintext value — a v-scoped
+            # scrub ships the attr plus a sha256[:12] fingerprint of v.
+            note = (f"attr:{a}" if v is None
+                    else f"attr-hash:{a}:{_v_hash(v)}")
+            conn.execute(
+                "INSERT INTO tx (op, agent, wrapper, note, hlc)"
+                " VALUES ('scrub', ?, ?, ?, ?)",
+                (SCRUB_WRAPPER, SCRUB_WRAPPER, note,
+                 _mint_ord(conn, node_id)))
+        if own:
+            conn.execute("COMMIT")
+    except BaseException:
+        if own:
+            conn.execute("ROLLBACK")
+        raise
     return n

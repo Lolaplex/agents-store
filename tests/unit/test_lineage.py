@@ -70,20 +70,25 @@ class TestMerge(unittest.TestCase):
         self.assertEqual(v["title"], "a")
         self.assertEqual(v["status"], "open")
 
-    def test_merge_conflict_leaves_all_values_current(self):
-        # Conflicting cardinality-one values all stay asserted: the anomaly
-        # marks the merge as unresolved; history retains every source value.
+    def test_merge_conflict_canonicalizes_to_max(self):
+        # Conflicting cardinality-one values are canonicalized the same way
+        # ingest does (max(v) wins, losers logged as conflict refusals) —
+        # writing all values at one ord would diverge from every peer.
         a = make(self.store, {"title": "first"})
         b = make(self.store, {"title": "second"})
         s = lineage.merge(self.store, [a, b], reason="dup titles")
         hist = [d.v for d in self.store.history(s) if d.added]
-        self.assertEqual(hist, ["first", "second"])
-        # v_current shows both (the conflict is visible, not silently resolved)
+        self.assertEqual(hist, ["second"])
         cur = self.conn.execute(
             "SELECT v FROM v_current WHERE e = ? AND a = 'title' ORDER BY v", (s,)
         ).fetchall()
-        self.assertEqual([r[0] for r in cur], ["first", "second"])
-        self.assertEqual(self.store.view(s)["title"], "second")  # deterministic pick
+        self.assertEqual([r[0] for r in cur], ["second"])
+        self.assertEqual(self.store.view(s)["title"], "second")
+        # the dropped candidate is a loud refusal, not silent resolution
+        rows = self.conn.execute(
+            "SELECT entity, attr, payload FROM refusal WHERE reason = 'merge_conflict'"
+        ).fetchall()
+        self.assertEqual(rows, [(s, "title", "first")])
 
     def test_merge_choose(self):
         a = make(self.store, {"title": "first"})
